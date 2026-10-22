@@ -36,7 +36,7 @@ class SimpleServer(BaseHTTPRequestHandler):
 
             action = query.get("action", [""])[0]
 
-            # Válasz küldése
+            # Válasz küldésekor elmentjük és visszairányítunk
             if action == "reply":
                 target_user = query.get("user", [""])[0]
                 reply_text = query.get("text", [""])[0]
@@ -55,14 +55,12 @@ class SimpleServer(BaseHTTPRequestHandler):
                 self.end_headers()
                 return
 
-            # Amint megnyitod az admin oldalat, AUTOMATIKUSAN olvasottá tesszük az összeset (nincs szükség külön gombra)
+            # Amint megnyitod az admin oldalt, az üzeneteket olvasottá tesszük, így a riasztás azonnal elhallgat
             chats = load_data(CHAT_FILE)
-            has_unread = any(not c.get("read", False) and c.get("sender") != "Lenner Műhely" for c in chats)
-            
-            if has_unread:
-                for msg in chats:
+            for msg in chats:
+                if msg.get("sender") != "Lenner Műhely":
                     msg["read"] = True
-                save_data(CHAT_FILE, chats)
+            save_data(CHAT_FILE, chats)
 
             users = load_data(DB_FILE)
 
@@ -83,27 +81,30 @@ class SimpleServer(BaseHTTPRequestHandler):
                     .card {{ background: #1E1E1E; padding: 15px; border-radius: 8px; margin-bottom: 20px; }}
                     input, button {{ padding: 8px; margin: 4px 0; background: #222; color: #fff; border: 1px solid #FF8C00; border-radius: 4px; }}
                     button {{ background: #FF8C00; color: #000; font-weight: bold; cursor: pointer; }}
+                    .refresh-banner {{ background: #D35400; color: #fff; padding: 10px; border-radius: 5px; margin-bottom: 15px; display: none; text-align: center; font-weight: bold; }}
                 </style>
                 <script>
-                    // Háttérben ellenőrzi, hogy érkezett-e új üzenet, de CSAK akkor frissíti a táblázatot, ha NEM írsz éppen semmit a mezőbe!
+                    // Nincs idegesítő auto-frissítés ami törli a szöveget! 
+                    // Csak háttérben figyeljük, hogy jött-e új üzenet, és ha igen, kiírunk egy kulturált gombot, amivel frissíthetsz.
                     setInterval(function() {{
-                        let activeElement = document.activeElement;
-                        if (!activeElement || activeElement.tagName !== 'INPUT' || activeElement.type !== 'text') {{
-                            fetch('/admin?pass={ADMIN_SECRET}&check_only=1')
-                            .then(response => response.json())
-                            .then(data => {{
-                                if (data.has_new) {{
-                                    location.reload(); // Ha új üzenet jött és nem gépelsz, frissítünk, hogy látsd
-                                }
-                            }}).catch(e => {{}});
-                        }}
-                    }}, 4000);
+                        fetch('/admin?pass={ADMIN_SECRET}&check_only=1')
+                        .then(response => response.json())
+                        .then(data => {{
+                            if (data.has_new) {{
+                                document.getElementById('refreshBanner').style.display = 'block';
+                            }}
+                        }}).catch(e => {{}});
+                    }}, 5000);
                 </script>
             </head>
             <body>
                 <h1>Lenner Gumiszerviz - Műhely Vezérlőpult</h1>
                 
-                <div class="card" id="chat-section">
+                <div id="refreshBanner" class="refresh-banner">
+                    Új üzenet érkezett! <a href="/admin?pass={ADMIN_SECRET}" style="color: #fff; text-decoration: underline; margin-left: 10px;">Kattints ide a frissítéshez</a>
+                </div>
+
+                <div class="card">
                     <h2>Élő Chat & Válaszadás</h2>
                     <table>
                         <tr><th>Küldő</th><th>Célzott Ügyfél</th><th>Üzenet</th><th>Válasz küldése</th></tr>
@@ -150,8 +151,8 @@ class SimpleServer(BaseHTTPRequestHandler):
             self.wfile.write(html.encode('utf-8'))
         
         elif path == "/admin" and query.get("check_only"):
-            # Gyors JSON ellenőrző háttérkéréshez
             chats = load_data(CHAT_FILE)
+            # Megnézzük, van-e olyan üzenet, ami azóta érkezett
             has_unread = any(not c.get("read", False) and c.get("sender") != "Lenner Műhely" for c in chats)
             self.send_response(200)
             self.send_header("Content-type", "application/json; charset=utf-8")
@@ -215,7 +216,6 @@ class SimpleServer(BaseHTTPRequestHandler):
             chats = load_data(CHAT_FILE)
             user_messages = [c for c in chats if c.get("sender") == username or c.get("target") == username or c.get("sender") == "Lenner Műhely"]
             
-            self.send_response200 = True
             self.send_response(200)
             self.send_header("Content-type", "application/json; charset=utf-8")
             self.end_headers()
