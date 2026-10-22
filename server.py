@@ -40,7 +40,7 @@ class SimpleServer(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps(chats, ensure_ascii=False).encode('utf-8'))
             return
 
-        # 2. Admin felület főoldal
+        # 2. Admin felület főoldal és akciók
         if path == "/admin":
             password = query.get("pass", [""])[0]
             if password != ADMIN_SECRET:
@@ -70,6 +70,20 @@ class SimpleServer(BaseHTTPRequestHandler):
                 self.wfile.write(b"OK")
                 return
 
+            # Felhasználó törlése
+            if action == "delete_user":
+                target_user = query.get("user", [""])[0]
+                if target_user:
+                    users = load_data(DB_FILE)
+                    if target_user in users:
+                        del users[target_user]
+                        save_data(DB_FILE, users)
+                
+                self.send_response(302)
+                self.send_header('Location', f'/admin?pass={ADMIN_SECRET}')
+                self.end_headers()
+                return
+
             users = load_data(DB_FILE)
             chats = load_data(CHAT_FILE)
 
@@ -90,6 +104,20 @@ class SimpleServer(BaseHTTPRequestHandler):
                     .card {{ background: #1E1E1E; padding: 15px; border-radius: 8px; margin-bottom: 20px; }}
                     input, button {{ padding: 8px; margin: 4px 0; background: #222; color: #fff; border: 1px solid #FF8C00; border-radius: 4px; }}
                     button {{ background: #FF8C00; color: #000; font-weight: bold; cursor: pointer; }}
+                    
+                    /* Törlés X gomb stílusa */
+                    .btn-delete {{
+                        background: #C0392B;
+                        color: #fff;
+                        border: none;
+                        padding: 5px 10px;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        font-weight: bold;
+                    }}
+                    .btn-delete:hover {{
+                        background: #E74C3C;
+                    }}
 
                     /* Jobb alsó sarok értesítő buborék */
                     #float-notification {{
@@ -176,15 +204,14 @@ class SimpleServer(BaseHTTPRequestHandler):
                 <script>
                     let currentChatUser = "";
                     let isChatOpen = false;
-                    let userLastSeenCount = {{}}; // Felhasználónként tároljuk, hány üzenetet láttunk tőlük
-                    let dismissedCountPerUser = {{}}; // Felhasználónként tároljuk, aminél kiikszeltük/lecsuktuk
+                    let userLastSeenCount = {{}};
+                    let dismissedCountPerUser = {{}};
 
                     // Háttérben ellenőrizzük az üzeneteket
                     setInterval(function() {{
                         fetch('/admin_api_messages?pass={ADMIN_SECRET}')
                         .then(res => res.json())
                         .then(chats => {{
-                            // Kigyűjtjük ügyfelenként az üzeneteket
                             let userMessages = {{}};
                             chats.forEach(c => {{
                                 if (c.sender !== "Lenner Műhely" && c.sender) {{
@@ -193,7 +220,6 @@ class SimpleServer(BaseHTTPRequestHandler):
                                 }}
                             }});
 
-                            // Megkeressük, van-e olyan ügyfél, akitől TÉNYLEG új üzenet jött (több van, mint amrég)
                             let alertUser = "";
                             for (let u in userMessages) {{
                                 let count = userMessages[u].length;
@@ -202,14 +228,13 @@ class SimpleServer(BaseHTTPRequestHandler):
                                 }}
                                 if (count > userLastSeenCount[u] && count !== dismissedCountPerUser[u]) {{
                                     alertUser = u;
-                                    break; // Megvan az első új üzenetet küldő
+                                    break;
                                 }}
                             }}
 
                             let notif = document.getElementById('float-notification');
 
                             if (alertUser) {{
-                                // Ha van új üzenet és nem ez a chat ablak van nyitva
                                 if (!isChatOpen || currentChatUser !== alertUser) {{
                                     currentChatUser = alertUser;
                                     notif.innerText = "Új üzenet: " + currentChatUser;
@@ -218,7 +243,6 @@ class SimpleServer(BaseHTTPRequestHandler):
                                 }}
                             }}
 
-                            // Ha nyitva van a chat ablak, frissítjük a buborékokat
                             if (isChatOpen && currentChatUser) {{
                                 renderChatMessages(chats, currentChatUser);
                                 if (userMessages[currentChatUser]) {{
@@ -228,12 +252,17 @@ class SimpleServer(BaseHTTPRequestHandler):
                         }}).catch(e => {{}});
                     }}, 3000);
 
+                    function confirmDelete(username) {{
+                        if (confirm("Biztosan szeretnéd törölni ezt a felhasználót (" + username + ")?")) {{
+                            window.location.href = '/admin?pass={ADMIN_SECRET}&action=delete_user&user=' + encodeURIComponent(username);
+                        }}
+                    }}
+
                     function handleNotificationClick() {{
                         let notif = document.getElementById('float-notification');
                         let modal = document.getElementById('chat-modal');
 
                         if (isChatOpen) {{
-                            // Lecsukás alulra: megjegyezzük az aktuális darabszámot, elhallgattatjuk a villogást
                             modal.style.display = 'none';
                             isChatOpen = false;
                             
@@ -249,7 +278,6 @@ class SimpleServer(BaseHTTPRequestHandler):
                                 fetch('/admin?pass={ADMIN_SECRET}&action=ack&user=' + encodeURIComponent(currentChatUser));
                             }}
                         }} else {{
-                            // Megnyitás: leáll a villogás, tisztán csak a név marad
                             notif.classList.remove('blinking');
                             notif.innerText = currentChatUser;
                             modal.style.display = 'flex';
@@ -328,17 +356,17 @@ class SimpleServer(BaseHTTPRequestHandler):
                 <h1>Lenner Gumiszerviz - Műhely Vezérlőpult</h1>
                 
                 <div class="card">
-                    <h2>Műhely Információk</h2>
-                    <p>A rendszer készen áll. Új üzenet érkezésekor a jobb alsó sarokban villogó buborék jelenik meg.</p>
-                </div>
-
-                <div class="card">
                     <h2>Regisztrált Felhasználók ({len(users)})</h2>
                     <table>
-                        <tr><th>Felhasználónév</th><th>Jelszó</th><th>Akció</th></tr>
+                        <tr><th>Felhasználónév</th><th>Jelszó</th><th>Üzenet küldése</th><th style="text-align: right;">Törlés</th></tr>
             """
             for user, pwd in users.items():
-                html += f"<tr><td>{user}</td><td>{pwd}</td><td><button onclick=\"currentChatUser='{user}'; document.getElementById('float-notification').innerText='{user}'; document.getElementById('float-notification').classList.remove('blinking'); document.getElementById('float-notification').style.display='flex'; document.getElementById('chat-modal').style.display='flex'; isChatOpen=true; document.getElementById('chat-title').innerText='Chat: {user}'; fetch('/admin_api_messages?pass={ADMIN_SECRET}').then(r=>r.json()).then(c=>{{ let uMsgs=c.filter(x=>x.sender==='{user}'); userLastSeenCount['{user}']=uMsgs.length; dismissedCountPerUser['{user}']=uMsgs.length; renderChatMessages(c,'{user}'); }}); fetch('/admin?pass={ADMIN_SECRET}&action=ack&user={user}');\">Üzenet küldése</button></td></tr>"
+                html += f"""<tr>
+                    <td>{user}</td>
+                    <td>{pwd}</td>
+                    <td><button onclick="currentChatUser='{user}'; document.getElementById('float-notification').innerText='{user}'; document.getElementById('float-notification').classList.remove('blinking'); document.getElementById('float-notification').style.display='flex'; document.getElementById('chat-modal').style.display='flex'; isChatOpen=true; document.getElementById('chat-title').innerText='Chat: {user}'; fetch('/admin_api_messages?pass={ADMIN_SECRET}').then(r=>r.json()).then(c=>{{ let uMsgs=c.filter(x=>x.sender==='{user}'); userLastSeenCount['{user}']=uMsgs.length; dismissedCountPerUser['{user}']=uMsgs.length; renderChatMessages(c,'{user}'); }}); fetch('/admin?pass={ADMIN_SECRET}&action=ack&user={user}');">Chat nyitása</button></td>
+                    <td style="text-align: right;"><button class="btn-delete" onclick="confirmDelete('{user}')">X Törlés</button></td>
+                </tr>"""
             html += f"""
                     </table>
                 </div>
@@ -434,7 +462,7 @@ class SimpleServer(BaseHTTPRequestHandler):
         elif self.path == "/get_messages":
             username = data.get("username", "")
             chats = load_data(CHAT_FILE)
-            user_messages = [c for c in chats if c.get("sender"] == username or c.get("target") == username or c.get("sender"] == "Lenner Műhely"]
+            user_messages = [c for c in chats if c.get("sender") == username or c.get("target") == username or c.get("sender") == "Lenner Műhely"]
             
             self.send_response(200)
             self.send_header("Content-type", "application/json; charset=utf-8")
