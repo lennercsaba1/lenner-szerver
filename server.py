@@ -93,7 +93,7 @@ class SimpleServer(BaseHTTPRequestHandler):
                 self.end_headers()
                 return
 
-            # CSAK AZ ADOTT FELHASZNÁLÓ CHATELŐZMÉNYEINEK TÖRLÉSE (A naplózás megmaradhat)
+            # CSAK AZ ADOTT FELHASZNÁLÓ CHATELŐZMÉNYEINEK TÖRLÉSE
             if action == "clear_chat":
                 target_user = query.get("user", [""])[0]
                 if target_user:
@@ -214,11 +214,11 @@ class SimpleServer(BaseHTTPRequestHandler):
                         gap: 12px;
                     }}
 
-                    /* BUBORÉKOK ALUL */
+                    /* BUBORÉKOK JOBB ALUL */
                     #bubbles-container {{
                         position: fixed;
                         bottom: 20px;
-                        right: 460px; /* Ne lógjon rá a jobb oldali sávra */
+                        right: 20px;
                         display: flex;
                         flex-direction: row-reverse;
                         gap: 12px;
@@ -257,11 +257,11 @@ class SimpleServer(BaseHTTPRequestHandler):
                         100% {{ opacity: 0.4; box-shadow: 0 0 25px #FF4500; }}
                     }}
 
-                    /* EGYES CHAT MODAL (KÖÉPEN/JOBBRA) */
+                    /* EGYES CHAT MODAL - PONT A BUBORÉK FELETT */
                     #chat-modal {{
                         position: fixed;
-                        bottom: 20px;
-                        right: 460px;
+                        bottom: 75px;
+                        right: 20px;
                         width: 420px;
                         height: 450px;
                         background: #1E1E1E;
@@ -431,7 +431,6 @@ class SimpleServer(BaseHTTPRequestHandler):
                                 }}
                             }}
 
-                            // Ha nyitva van a napló sáv, frissítsük azt is folyamatosan
                             let logSidebar = document.getElementById('log-sidebar');
                             if (logSidebar.style.display === 'flex') {{
                                 renderLoggedChats(chats);
@@ -516,7 +515,6 @@ class SimpleServer(BaseHTTPRequestHandler):
                         }}
                     }}
 
-                    /* NAPLÓZOTT BESZÉLGETÉSEK PANEL NYITÁSA / ZÁRÁSA */
                     function toggleLoggedChats() {{
                         let sidebar = document.getElementById('log-sidebar');
                         if (sidebar.style.display === 'flex') {{
@@ -685,7 +683,7 @@ class SimpleServer(BaseHTTPRequestHandler):
             self.end_headers()
             return
         else:
-            self.send_response404 if hasattr(self, 'send_response404') else self.send_response(404)
+            self.send_response(404)
             self.end_headers()
 
     def do_POST(self):
