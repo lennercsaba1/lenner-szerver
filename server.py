@@ -93,7 +93,7 @@ class SimpleServer(BaseHTTPRequestHandler):
                 self.end_headers()
                 return
 
-            # CSAK AZ ADOTT FELHASZNÁLÓ CHATELŐZMÉNYEINEK TÖRLÉSE
+            # CSAK AZ ADOTT FELHASZNÁLÓ CHATELŐZMÉNYEINEK TÖRLÉSE (A naplózás megmaradhat)
             if action == "clear_chat":
                 target_user = query.get("user", [""])[0]
                 if target_user:
@@ -118,7 +118,7 @@ class SimpleServer(BaseHTTPRequestHandler):
             <head>
                 <title>Lenner Műhely Admin Panel</title>
                 <style>
-                    body {{ font-family: Arial; background: #121212; color: #fff; padding: 20px; margin: 0; }}
+                    body {{ font-family: Arial, sans-serif; background: #121212; color: #fff; padding: 20px; margin: 0; }}
                     .header-container {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }}
                     h1, h2 {{ color: #FF8C00; margin: 0; }}
                     table {{ border-collapse: collapse; width: 100%; margin-bottom: 20px; background: #1E1E1E; }}
@@ -155,6 +155,20 @@ class SimpleServer(BaseHTTPRequestHandler):
                         background: #9B59B6;
                     }}
 
+                    .btn-log {{
+                        background: #FF8C00;
+                        color: #000;
+                        border: none;
+                        padding: 6px 12px;
+                        border-radius: 4px;
+                        font-weight: bold;
+                        cursor: pointer;
+                        margin-left: 8px;
+                    }}
+                    .btn-log:hover {{
+                        background: #FFA500;
+                    }}
+
                     .sound-toggle-btn {{
                         background: #222;
                         color: #FF8C00;
@@ -165,55 +179,97 @@ class SimpleServer(BaseHTTPRequestHandler):
                         cursor: pointer;
                     }}
 
+                    /* JOBB OLDALI NAPLÓZOTT BESZÉLGETÉSEK SÁVJA */
+                    #log-sidebar {{
+                        position: fixed;
+                        top: 20px;
+                        right: 20px;
+                        width: 420px;
+                        height: calc(100vh - 100px);
+                        background: #1A1A1A;
+                        border: 2px solid #FF8C00;
+                        border-radius: 10px;
+                        display: none;
+                        flex-direction: column;
+                        box-shadow: 0 5px 25px rgba(0,0,0,0.8);
+                        z-index: 999;
+                    }}
+                    #log-header {{
+                        background: #222;
+                        padding: 12px 15px;
+                        color: #FF8C00;
+                        font-weight: bold;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        border-top-left-radius: 8px;
+                        border-top-right-radius: 8px;
+                    }}
+                    #log-body {{
+                        flex: 1;
+                        padding: 15px;
+                        overflow-y: auto;
+                        display: flex;
+                        flex-direction: column;
+                        gap: 12px;
+                    }}
+
+                    /* BUBORÉKOK ALUL */
                     #bubbles-container {{
                         position: fixed;
                         bottom: 20px;
-                        right: 20px;
+                        right: 460px; /* Ne lógjon rá a jobb oldali sávra */
                         display: flex;
                         flex-direction: row-reverse;
-                        gap: 10px;
+                        gap: 12px;
                         z-index: 1000;
                     }}
 
                     .user-bubble {{
-                        width: 180px;
-                        height: 45px;
-                        background: #D35400;
-                        color: #fff;
-                        border-radius: 8px;
+                        min-width: 160px;
+                        padding: 10px 16px;
+                        background: #E67E22;
+                        color: #FFFFFF;
+                        border: 2px solid #FF8C00;
+                        border-radius: 12px;
                         display: flex;
                         align-items: center;
                         justify-content: center;
                         font-weight: bold;
                         cursor: pointer;
-                        box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+                        box-shadow: 0 4px 15px rgba(255, 140, 0, 0.4);
                         text-align: center;
-                        font-size: 13px;
-                        padding: 5px;
+                        font-size: 14px;
                         box-sizing: border-box;
+                        transition: transform 0.2s;
+                    }}
+                    .user-bubble:hover {{
+                        transform: scale(1.05);
                     }}
 
                     .blinking {{
-                        animation: blink 1s infinite;
+                        background: #D35400 !important;
+                        border-color: #FF4500 !important;
+                        animation: blink 0.8s infinite alternate;
                     }}
                     @keyframes blink {{
-                        0% {{ opacity: 1; }}
-                        50% {{ opacity: 0.3; }}
-                        100% {{ opacity: 1; }}
+                        0% {{ opacity: 1; box-shadow: 0 0 10px #FF8C00; }}
+                        100% {{ opacity: 0.4; box-shadow: 0 0 25px #FF4500; }}
                     }}
 
+                    /* EGYES CHAT MODAL (KÖÉPEN/JOBBRA) */
                     #chat-modal {{
                         position: fixed;
-                        bottom: 75px;
-                        right: 20px;
-                        width: 450px;
-                        height: 480px;
+                        bottom: 20px;
+                        right: 460px;
+                        width: 420px;
+                        height: 450px;
                         background: #1E1E1E;
                         border: 2px solid #FF8C00;
                         border-radius: 10px;
                         display: none;
                         flex-direction: column;
-                        box-shadow: 0 5px 15px rgba(0,0,0,0.7);
+                        box-shadow: 0 5px 25px rgba(0,0,0,0.8);
                         z-index: 1001;
                     }}
                     #chat-header {{
@@ -350,11 +406,9 @@ class SimpleServer(BaseHTTPRequestHandler):
                             for (let u in userMessages) {{
                                 let count = userMessages[u].length;
 
-                                // Ha teljesen új felhasználó vagy több üzenete érkezett, mint amennyit utoljára láttunk
                                 if (!(u in userLastSeenCount) || count > userLastSeenCount[u]) {{
                                     createOrUpdateBubble(u, true);
                                     
-                                    // Ha a chat ablak épp NYITVA van nála, az üzeneteket látottnak tekintjük
                                     if (isChatOpen && currentChatUser === u) {{
                                         userLastSeenCount[u] = count;
                                     }} else {{
@@ -376,6 +430,12 @@ class SimpleServer(BaseHTTPRequestHandler):
                                     setStorage('userLastSeenCount', userLastSeenCount);
                                 }}
                             }}
+
+                            // Ha nyitva van a napló sáv, frissítsük azt is folyamatosan
+                            let logSidebar = document.getElementById('log-sidebar');
+                            if (logSidebar.style.display === 'flex') {{
+                                renderLoggedChats(chats);
+                            }}
                         }}).catch(e => {{}});
                     }}
 
@@ -395,10 +455,10 @@ class SimpleServer(BaseHTTPRequestHandler):
                         }}
 
                         if (isBlinking && (!isChatOpen || currentChatUser !== username)) {{
-                            bubble.innerText = "Új üzenet: " + username;
+                            bubble.innerText = "💬 Új üzenet: " + username;
                             bubble.classList.add('blinking');
                         }} else {{
-                            bubble.innerText = username;
+                            bubble.innerText = "👤 " + username;
                             bubble.classList.remove('blinking');
                         }}
 
@@ -413,7 +473,10 @@ class SimpleServer(BaseHTTPRequestHandler):
                         if (isChatOpen && currentChatUser === username) {{
                             modal.style.display = 'none';
                             isChatOpen = false;
-                            if (bubble) bubble.classList.remove('blinking');
+                            if (bubble) {{
+                                bubble.innerText = "👤 " + username;
+                                bubble.classList.remove('blinking');
+                            }}
                         }} else {{
                             currentChatUser = username;
                             document.getElementById('chat-title').innerText = "Chat: " + username;
@@ -421,7 +484,7 @@ class SimpleServer(BaseHTTPRequestHandler):
                             isChatOpen = true;
 
                             if (bubble) {{
-                                bubble.innerText = username;
+                                bubble.innerText = "👤 " + username;
                                 bubble.classList.remove('blinking');
                             }}
 
@@ -453,6 +516,41 @@ class SimpleServer(BaseHTTPRequestHandler):
                         }}
                     }}
 
+                    /* NAPLÓZOTT BESZÉLGETÉSEK PANEL NYITÁSA / ZÁRÁSA */
+                    function toggleLoggedChats() {{
+                        let sidebar = document.getElementById('log-sidebar');
+                        if (sidebar.style.display === 'flex') {{
+                            sidebar.style.display = 'none';
+                        }} else {{
+                            sidebar.style.display = 'flex';
+                            fetch('/admin_api_messages?pass={ADMIN_SECRET}')
+                            .then(res => res.json())
+                            .then(chats => {{
+                                renderLoggedChats(chats);
+                            }});
+                        }}
+                    }}
+
+                    function renderLoggedChats(chats) {{
+                        let body = document.getElementById('log-body');
+                        let html = '';
+                        if (chats.length === 0) {{
+                            html = '<div style="color: #888; text-align: center; margin-top: 20px;">Nincsenek még üzenetek a naplóban.</div>';
+                        }} else {{
+                            chats.forEach(msg => {{
+                                let isMe = (msg.sender === "Lenner Műhely");
+                                let senderLabel = isMe ? "Lenner Műhely ➔ " + (msg.target || "Ügyfél") : msg.sender;
+                                let bubbleClass = isMe ? "msg-admin" : "msg-user";
+                                html += `<div style="margin-bottom: 8px;">
+                                    <small style="display:block; font-size:11px; color:#FF8C00; font-weight:bold;">${{senderLabel}}</small>
+                                    <div class="message-bubble ${{bubbleClass}}" style="max-width: 100%;">${{msg.text}}</div>
+                                </div>`;
+                            }});
+                        }}
+                        body.innerHTML = html;
+                        body.scrollTop = body.scrollHeight;
+                    }}
+
                     function confirmDelete(username) {{
                         if (confirm("Biztosan szeretnéd törölni ezt a felhasználót (" + username + ") és minden üzenetét?")) {{
                             let pB = getStorage('persistentBubbles');
@@ -468,7 +566,7 @@ class SimpleServer(BaseHTTPRequestHandler):
                     }}
 
                     function confirmClearChat(username) {{
-                        if (confirm("Biztosan törölni szeretnéd " + username + " összes chatelőzményét?")) {{
+                        if (confirm("Biztosan törölni szeretnéd " + username + " aktív chatelőzményét?")) {{
                             let pB = getStorage('persistentBubbles');
                             delete pB[username];
                             setStorage('persistentBubbles', pB);
@@ -511,6 +609,10 @@ class SimpleServer(BaseHTTPRequestHandler):
                                 userLastSeenCount[currentChatUser] = uMsgs.length;
                                 setStorage('userLastSeenCount', userLastSeenCount);
                                 renderChatMessages(chats, currentChatUser);
+                                let logSidebar = document.getElementById('log-sidebar');
+                                if (logSidebar.style.display === 'flex') {{
+                                    renderLoggedChats(chats);
+                                }}
                             }});
                         }});
                     }}
@@ -525,13 +627,16 @@ class SimpleServer(BaseHTTPRequestHandler):
                 <div class="card">
                     <h2>Regisztrált Felhasználók ({len(users)})</h2>
                     <table>
-                        <tr><th>Felhasználónév</th><th>Jelszó</th><th>Üzenet küldése</th><th style="text-align: right;">Műveletek</th></tr>
+                        <tr><th>Felhasználónév</th><th>Jelszó</th><th>Üzenetek kezelése</th><th style="text-align: right;">Műveletek</th></tr>
             """
             for user, pwd in users.items():
                 html += f"""<tr>
                     <td>{user}</td>
                     <td>{pwd}</td>
-                    <td><button onclick="createOrUpdateBubble('{user}', false); toggleUserChat('{user}');">Chat nyitása</button></td>
+                    <td>
+                        <button onclick="createOrUpdateBubble('{user}', false); toggleUserChat('{user}');">Chat nyitása</button>
+                        <button class="btn-log" onclick="toggleLoggedChats()">Naplózott beszélgetés</button>
+                    </td>
                     <td style="text-align: right;">
                         <button class="btn-clear-chat" onclick="confirmClearChat('{user}')">Chat törlése</button>
                         <button class="btn-delete" onclick="confirmDelete('{user}')">X Törlés</button>
@@ -539,6 +644,15 @@ class SimpleServer(BaseHTTPRequestHandler):
                 </tr>"""
             html += f"""
                     </table>
+                </div>
+
+                <!-- JOBB OLDALI NAPLÓZOTT BESZÉLGETÉS SÁV -->
+                <div id="log-sidebar">
+                    <div id="log-header">
+                        <span>Minden naplózott beszélgetés</span>
+                        <button onclick="toggleLoggedChats()" style="background: #444; color: #fff; padding: 2px 8px; margin:0;">X</button>
+                    </div>
+                    <div id="log-body"></div>
                 </div>
 
                 <div id="bubbles-container"></div>
@@ -571,7 +685,7 @@ class SimpleServer(BaseHTTPRequestHandler):
             self.end_headers()
             return
         else:
-            self.send_response(404)
+            self.send_response404 if hasattr(self, 'send_response404') else self.send_response(404)
             self.end_headers()
 
     def do_POST(self):
