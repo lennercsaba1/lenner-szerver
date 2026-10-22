@@ -209,9 +209,24 @@ class SimpleServer(BaseHTTPRequestHandler):
                 <script>
                     let currentChatUser = "";
                     let isChatOpen = false;
-                    let userLastSeenCount = {{}};
-                    let dismissedCountPerUser = {{}};
-                    let activeUserBubbles = {{}};
+
+                    // Adatok betöltése localStorage-ból, hogy frissítés után is megmaradjon a memória
+                    function getStorage(key) {{
+                        try {{
+                            return JSON.parse(localStorage.getItem(key)) || {{}};
+                        }} catch(e) {{
+                            return {{}};
+                        }}
+                    }}
+
+                    function setStorage(key, val) {{
+                        try {{
+                            localStorage.setItem(key, JSON.stringify(val));
+                        }} catch(e) {{}}
+                    }}
+
+                    let userLastSeenCount = getStorage('userLastSeenCount');
+                    let dismissedCountPerUser = getStorage('dismissedCountPerUser');
 
                     setInterval(function() {{
                         fetch('/admin_api_messages?pass={ADMIN_SECRET}')
@@ -229,6 +244,7 @@ class SimpleServer(BaseHTTPRequestHandler):
                                 let count = userMessages[u].length;
                                 if (!(u in userLastSeenCount)) userLastSeenCount[u] = 0;
 
+                                // Csak akkor villog, ha VALÓBAN érkezett ÚJ üzenet a legutóbb látott óta
                                 if (count > userLastSeenCount[u] && count !== dismissedCountPerUser[u]) {{
                                     createOrUpdateBubble(u, true);
                                 }}
@@ -238,6 +254,7 @@ class SimpleServer(BaseHTTPRequestHandler):
                                 renderChatMessages(chats, currentChatUser);
                                 if (userMessages[currentChatUser]) {{
                                     userLastSeenCount[currentChatUser] = userMessages[currentChatUser].length;
+                                    setStorage('userLastSeenCount', userLastSeenCount);
                                 }}
                             }}
                         }}).catch(e => {{}});
@@ -263,8 +280,6 @@ class SimpleServer(BaseHTTPRequestHandler):
                             bubble.innerText = username;
                             bubble.classList.remove('blinking');
                         }}
-
-                        activeUserBubbles[username] = true;
                     }}
 
                     function toggleUserChat(username) {{
@@ -282,6 +297,8 @@ class SimpleServer(BaseHTTPRequestHandler):
                                 let uMsgs = chats.filter(c => c.sender === username);
                                 userLastSeenCount[username] = uMsgs.length;
                                 dismissedCountPerUser[username] = uMsgs.length;
+                                setStorage('userLastSeenCount', userLastSeenCount);
+                                setStorage('dismissedCountPerUser', dismissedCountPerUser);
                             }});
 
                             fetch('/admin?pass={ADMIN_SECRET}&action=ack&user=' + encodeURIComponent(username));
@@ -302,6 +319,8 @@ class SimpleServer(BaseHTTPRequestHandler):
                                 let uMsgs = chats.filter(c => c.sender === username);
                                 userLastSeenCount[username] = uMsgs.length;
                                 dismissedCountPerUser[username] = uMsgs.length;
+                                setStorage('userLastSeenCount', userLastSeenCount);
+                                setStorage('dismissedCountPerUser', dismissedCountPerUser);
                                 renderChatMessages(chats, username);
                                 fetch('/admin?pass={ADMIN_SECRET}&action=ack&user=' + encodeURIComponent(username));
                             }});
@@ -318,14 +337,14 @@ class SimpleServer(BaseHTTPRequestHandler):
                             let bubble = document.getElementById('bubble-' + currentChatUser);
                             if (bubble) bubble.remove();
                             
-                            delete activeUserBubbles[currentChatUser];
-
                             fetch('/admin_api_messages?pass={ADMIN_SECRET}')
                             .then(res => res.json())
                             .then(chats => {{
                                 let uMsgs = chats.filter(c => c.sender === currentChatUser);
                                 userLastSeenCount[currentChatUser] = uMsgs.length;
                                 dismissedCountPerUser[currentChatUser] = uMsgs.length;
+                                setStorage('userLastSeenCount', userLastSeenCount);
+                                setStorage('dismissedCountPerUser', dismissedCountPerUser);
                                 fetch('/admin?pass={ADMIN_SECRET}&action=ack&user=' + encodeURIComponent(currentChatUser));
                                 currentChatUser = "";
                             }});
@@ -367,6 +386,8 @@ class SimpleServer(BaseHTTPRequestHandler):
                                 let uMsgs = chats.filter(c => c.sender === currentChatUser);
                                 userLastSeenCount[currentChatUser] = uMsgs.length;
                                 dismissedCountPerUser[currentChatUser] = uMsgs.length;
+                                setStorage('userLastSeenCount', userLastSeenCount);
+                                setStorage('dismissedCountPerUser', dismissedCountPerUser);
                                 renderChatMessages(chats, currentChatUser);
                             }});
                         }});
@@ -478,7 +499,6 @@ class SimpleServer(BaseHTTPRequestHandler):
             username = data.get("username", "")
             chats = load_data(CHAT_FILE)
             
-            # --- ITT VOLT A HIBA: Csak azokat az admin üzeneteket adjuk vissza, amiknek a target-je pontosan ez a felhasználó! ---
             user_messages = [
                 c for c in chats 
                 if c.get("sender") == username or 
