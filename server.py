@@ -36,7 +36,7 @@ class SimpleServer(BaseHTTPRequestHandler):
 
             action = query.get("action", [""])[0]
 
-            # Válasz küldésekor elmentjük és visszairányítunk
+            # Válasz küldése
             if action == "reply":
                 target_user = query.get("user", [""])[0]
                 reply_text = query.get("text", [""])[0]
@@ -55,7 +55,7 @@ class SimpleServer(BaseHTTPRequestHandler):
                 self.end_headers()
                 return
 
-            # Amint megnyitod az admin oldalt, az üzeneteket olvasottá tesszük, így a riasztás azonnal elhallgat
+            # Admin megnyitásakor olvasottá tesszük a régieket, hogy ne szóljon a riasztás
             chats = load_data(CHAT_FILE)
             for msg in chats:
                 if msg.get("sender") != "Lenner Műhely":
@@ -81,33 +81,55 @@ class SimpleServer(BaseHTTPRequestHandler):
                     .card {{ background: #1E1E1E; padding: 15px; border-radius: 8px; margin-bottom: 20px; }}
                     input, button {{ padding: 8px; margin: 4px 0; background: #222; color: #fff; border: 1px solid #FF8C00; border-radius: 4px; }}
                     button {{ background: #FF8C00; color: #000; font-weight: bold; cursor: pointer; }}
-                    .refresh-banner {{ background: #D35400; color: #fff; padding: 10px; border-radius: 5px; margin-bottom: 15px; display: none; text-align: center; font-weight: bold; }}
                 </style>
                 <script>
-                    // Nincs idegesítő auto-frissítés ami törli a szöveget! 
-                    // Csak háttérben figyeljük, hogy jött-e új üzenet, és ha igen, kiírunk egy kulturált gombot, amivel frissíthetsz.
+                    // Háttérben lekérdezzük az üzeneteket JSON-ben, így nem rántjuk szét az oldalt és a gépelést sem töröljük ki!
                     setInterval(function() {{
-                        fetch('/admin?pass={ADMIN_SECRET}&check_only=1')
-                        .then(response => response.json())
-                        .then(data => {{
-                            if (data.has_new) {{
-                                document.getElementById('refreshBanner').style.display = 'block';
-                            }}
+                        let activeInput = document.activeElement;
+                        // HA éppen belemértél egy szövegmezőbe és gépelsz, SEMMI CSETRE SEM FRISSÍTÜNK!
+                        if (activeInput && activeInput.tagName === 'INPUT' && activeInput.type === 'text') {{
+                            return; 
+                        }}
+
+                        fetch('/admin_api_messages?pass={ADMIN_SECRET}')
+                        .then(res => res.json())
+                        .then(chats => {{
+                            let tbody = document.getElementById('chat-tbody');
+                            let rows = '';
+                            chats.forEach(msg => {{
+                                let sender = msg.sender || 'Ismeretlen';
+                                let target = msg.target || 'Mindenki';
+                                let text = msg.text || '';
+                                let replyForm = '';
+                                
+                                if (sender !== "Lenner Műhely") {{
+                                    replyForm = `<form action="/admin" method="GET">
+                                        <input type="hidden" name="pass" value="{ADMIN_SECRET}">
+                                        <input type="hidden" name="action" value="reply">
+                                        <input type="hidden" name="user" value="${sender}">
+                                        <input type="text" name="text" placeholder="Írd be a választ..." required>
+                                        <button type="submit">Küldés</button>
+                                    </form>`;
+                                }} else {{
+                                    replyForm = "<i>Admin válasz</i>";
+                                }}
+                                rows += `<tr><td><b>${sender}</b></td><td>${target}</td><td>${text}</td><td>${replyForm}</td></tr>`;
+                            }});
+                            if(tbody) tbody.innerHTML = rows;
                         }}).catch(e => {{}});
-                    }}, 5000);
+                    }}, 3000);
                 </script>
             </head>
             <body>
                 <h1>Lenner Gumiszerviz - Műhely Vezérlőpult</h1>
-                
-                <div id="refreshBanner" class="refresh-banner">
-                    Új üzenet érkezett! <a href="/admin?pass={ADMIN_SECRET}" style="color: #fff; text-decoration: underline; margin-left: 10px;">Kattints ide a frissítéshez</a>
-                </div>
 
                 <div class="card">
                     <h2>Élő Chat & Válaszadás</h2>
                     <table>
-                        <tr><th>Küldő</th><th>Célzott Ügyfél</th><th>Üzenet</th><th>Válasz küldése</th></tr>
+                        <thead>
+                            <tr><th>Küldő</th><th>Célzott Ügyfél</th><th>Üzenet</th><th>Válasz küldése</th></tr>
+                        </thead>
+                        <tbody id="chat-tbody">
             """
             if isinstance(chats, list):
                 for msg in chats:
@@ -132,6 +154,7 @@ class SimpleServer(BaseHTTPRequestHandler):
                     html += f"<tr><td><b>{sender}</b></td><td>{target}</td><td>{text}</td><td>{reply_form}</td></tr>"
 
             html += f"""
+                        </tbody>
                     </table>
                 </div>
 
@@ -149,15 +172,20 @@ class SimpleServer(BaseHTTPRequestHandler):
             </html>
             """
             self.wfile.write(html.encode('utf-8'))
-        
-        elif path == "/admin" and query.get("check_only"):
+
+        # Külön végpont a háttérbeli JSON chat frissítéshez (ez nem bántja a gépelést)
+        elif path == "/admin_api_messages":
+            password = query.get("pass", [""])[0]
+            if password != ADMIN_SECRET:
+                self.send_response(401)
+                self.end_headers()
+                return
             chats = load_data(CHAT_FILE)
-            # Megnézzük, van-e olyan üzenet, ami azóta érkezett
-            has_unread = any(not c.get("read", False) and c.get("sender") != "Lenner Műhely" for c in chats)
             self.send_response(200)
             self.send_header("Content-type", "application/json; charset=utf-8")
             self.end_headers()
-            self.wfile.write(json.dumps({"has_new": has_unread}).encode('utf-8'))
+            self.wfile.write(json.dumps(chats, ensure_ascii=False).encode('utf-8'))
+
         else:
             self.send_response(404)
             self.end_headers()
@@ -214,7 +242,7 @@ class SimpleServer(BaseHTTPRequestHandler):
         elif self.path == "/get_messages":
             username = data.get("username", "")
             chats = load_data(CHAT_FILE)
-            user_messages = [c for c in chats if c.get("sender") == username or c.get("target") == username or c.get("sender") == "Lenner Műhely"]
+            user_messages = [c for c in chats if c.get("sender") == username or c.get("target"] == username or c.get("sender"] == "Lenner Műhely"]
             
             self.send_response(200)
             self.send_header("Content-type", "application/json; charset=utf-8")
