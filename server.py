@@ -2,6 +2,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
 import os
 import urllib.parse
+from datetime import datetime
 
 DB_FILE = "adatbazis.json"
 CHAT_FILE = "chat_uzenetek.json"
@@ -76,10 +77,12 @@ class SimpleServer(BaseHTTPRequestHandler):
                 target_user = query.get("user", [""])[0]
                 reply_text = query.get("text", [""])[0]
                 if target_user and reply_text:
+                    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     new_msg = {
                         "sender": "Lenner Műhely",
                         "target": target_user,
                         "text": reply_text,
+                        "timestamp": now_str,
                         "read": True
                     }
                     chats = load_data(CHAT_FILE)
@@ -566,8 +569,9 @@ class SimpleServer(BaseHTTPRequestHandler):
                                     let isMe = (msg.sender === "Lenner Műhely");
                                     let bubbleClass = isMe ? "msg-admin" : "msg-user";
                                     let senderLabel = isMe ? "Lenner Műhely" : msg.sender;
+                                    let timeStr = msg.timestamp ? ` [${{msg.timestamp}}]` : '';
                                     html += `<div>
-                                        <small style="display:block; font-size:10px; opacity:0.7;">${{senderLabel}}</small>
+                                        <small style="display:block; font-size:10px; opacity:0.7;">${{senderLabel}}${{timeStr}}</small>
                                         <div class="message-bubble ${{bubbleClass}}">${{msg.text}}</div>
                                     </div>`;
                                 }});
@@ -577,7 +581,7 @@ class SimpleServer(BaseHTTPRequestHandler):
                         }});
                     }}
 
-                    /* NAPLÓ MENTÉSE .DOC FÁJLBA */
+                    /* NAPLÓ MENTÉSE .DOC FÁJLBA DÁTUMOZÁSSAL */
                     function saveLogAsDoc() {{
                         if (!currentLogUser) return;
                         
@@ -605,9 +609,10 @@ class SimpleServer(BaseHTTPRequestHandler):
 
                             userLogs.forEach(msg => {{
                                 let senderLabel = (msg.sender === "Lenner Műhely") ? "Lenner Műhely (Admin)" : msg.sender;
+                                let timeStr = msg.timestamp ? ` - ${msg.timestamp}` : '';
                                 docContent += `<div style="margin-bottom: 12px; padding: 8px; background: #f4f4f4; border-left: 4px solid #FF8C00;">
-                                    <small style="color: #666; font-size: 11px;">${{senderLabel}}:</small><br/>
-                                    <span style="font-size: 14px;">${{msg.text}}</span>
+                                    <small style="color: #666; font-size: 11px;"><strong>${{senderLabel}}</strong>${{timeStr}}</small><br/>
+                                    <span style="font-size: 14px; display:inline-block; margin-top:4px;">${{msg.text}}</span>
                                 </div>`;
                             }});
 
@@ -661,7 +666,8 @@ class SimpleServer(BaseHTTPRequestHandler):
                                 let isMe = (msg.sender === "Lenner Műhely");
                                 let bubbleClass = isMe ? "msg-admin" : "msg-user";
                                 let senderName = isMe ? "Én (Műhely)" : msg.sender;
-                                html += `<div class="message-bubble ${{bubbleClass}}"><small style="display:block; font-size:10px; opacity:0.7;">${{senderName}}</small>${{msg.text}}</div>`;
+                                let timeStr = msg.timestamp ? ` [${{msg.timestamp}}]` : '';
+                                html += `<div class="message-bubble ${{bubbleClass}}"><small style="display:block; font-size:10px; opacity:0.7;">${{senderName}}${{timeStr}}</small>${{msg.text}}</div>`;
                             }}
                         }});
                         body.innerHTML = html;
@@ -806,6 +812,11 @@ class SimpleServer(BaseHTTPRequestHandler):
             chats = load_data(CHAT_FILE)
             if not isinstance(chats, list):
                 chats = []
+            
+            # Időbélyeg hozzáadása, ha az appból nem érkezett volna
+            if "timestamp" not in data or not data["timestamp"]:
+                data["timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
             data["read"] = False
             chats.append(data)
             save_data(CHAT_FILE, chats)
