@@ -76,24 +76,32 @@ class SimpleServer(BaseHTTPRequestHandler):
             if action == "delete_user":
                 target_user = query.get("user", [""])[0]
                 if target_user:
-                    # 1. Törlés a felhasználói adatbázisból
+                    # 1. Felhasználó törlése a DB-ből
                     users = load_data(DB_FILE)
                     if target_user in users:
                         del users[target_user]
                         save_data(DB_FILE, users)
                     
-                    # 2. Törlés a chat üzenetekből (kizárólag a nem erre a userre vonatkozókat tartjuk meg)
+                    # 2. Összes üzenet radikális törlése, ami ehhez a felhasználóhoz kötődik
                     chats = load_data(CHAT_FILE)
                     filtered_chats = []
                     for c in chats:
                         sender = c.get("sender", "")
                         target = c.get("target", "")
-                        # Ha a küldő vagy a célzott ez a felhasználó, akkor eldobjuk
+                        # Ha a küldő vagy a célzott ez a felhasználó, eldobjuk
                         if sender != target_user and target != target_user:
                             filtered_chats.append(c)
                     
                     save_data(CHAT_FILE, filtered_chats)
                 
+                self.send_response(302)
+                self.send_header('Location', f'/admin?pass={ADMIN_SECRET}')
+                self.end_headers()
+                return
+
+            # Minden chatelőzmény törlése gomb akciója
+            if action == "clear_all_chats":
+                save_data(CHAT_FILE, [])
                 self.send_response(302)
                 self.send_header('Location', f'/admin?pass={ADMIN_SECRET}')
                 self.end_headers()
@@ -132,6 +140,19 @@ class SimpleServer(BaseHTTPRequestHandler):
                     }}
                     .btn-delete:hover {{
                         background: #E74C3C;
+                    }}
+
+                    .btn-clear-chats {{
+                        background: #8E44AD;
+                        color: #fff;
+                        border: none;
+                        padding: 10px 15px;
+                        font-weight: bold;
+                        border-radius: 6px;
+                        cursor: pointer;
+                    }}
+                    .btn-clear-chats:hover {{
+                        background: #9B59B6;
                     }}
 
                     .sound-toggle-btn {{
@@ -464,6 +485,15 @@ class SimpleServer(BaseHTTPRequestHandler):
                         }}
                     }}
 
+                    function confirmClearAllChats() {{
+                        if (confirm("Biztosan törölni szeretnéd az ÖSSZES chatelőzményt a rendszerből?")) {{
+                            localStorage.removeItem('persistentBubbles');
+                            localStorage.removeItem('userLastSeenCount');
+                            localStorage.removeItem('dismissedCountPerUser');
+                            window.location.href = '/admin?pass={ADMIN_SECRET}&action=clear_all_chats';
+                        }}
+                    }}
+
                     function renderChatMessages(chats, username) {{
                         let body = document.getElementById('chat-body');
                         let html = '';
@@ -504,7 +534,10 @@ class SimpleServer(BaseHTTPRequestHandler):
             <body>
                 <div class="header-container">
                     <h1>Lenner Gumiszerviz - Műhely Vezérlőpult</h1>
-                    <button id="sound-btn" class="sound-toggle-btn" onclick="toggleSound()">🔊 Hang: BE</button>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn-clear-chats" onclick="confirmClearAllChats()">Összes chat törlése</button>
+                        <button id="sound-btn" class="sound-toggle-btn" onclick="toggleSound()">🔊 Hang: BE</button>
+                    </div>
                 </div>
                 
                 <div class="card">
