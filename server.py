@@ -35,18 +35,8 @@ class SimpleServer(BaseHTTPRequestHandler):
                 return
 
             action = query.get("action", [""])[0]
-            
-            if action == "ack":
-                chats = load_data(CHAT_FILE)
-                for msg in chats:
-                    msg["read"] = True
-                save_data(CHAT_FILE, chats)
-                
-                self.send_response(302)
-                self.send_header('Location', f'/admin?pass={ADMIN_SECRET}')
-                self.end_headers()
-                return
 
+            # Válasz küldése
             if action == "reply":
                 target_user = query.get("user", [""])[0]
                 reply_text = query.get("text", [""])[0]
@@ -65,9 +55,16 @@ class SimpleServer(BaseHTTPRequestHandler):
                 self.end_headers()
                 return
 
-            users = load_data(DB_FILE)
+            # Amint megnyitod az admin oldalat, AUTOMATIKUSAN olvasottá tesszük az összeset (nincs szükség külön gombra)
             chats = load_data(CHAT_FILE)
             has_unread = any(not c.get("read", False) and c.get("sender") != "Lenner Műhely" for c in chats)
+            
+            if has_unread:
+                for msg in chats:
+                    msg["read"] = True
+                save_data(CHAT_FILE, chats)
+
+            users = load_data(DB_FILE)
 
             self.send_response(200)
             self.send_header("Content-type", "text/html; charset=utf-8")
@@ -88,17 +85,17 @@ class SimpleServer(BaseHTTPRequestHandler):
                     button {{ background: #FF8C00; color: #000; font-weight: bold; cursor: pointer; }}
                 </style>
                 <script>
+                    // Háttérben ellenőrzi, hogy érkezett-e új üzenet, de CSAK akkor frissíti a táblázatot, ha NEM írsz éppen semmit a mezőbe!
                     setInterval(function() {{
                         let activeElement = document.activeElement;
-                        if (!activeElement || activeElement.tagName !== 'INPUT') {{
-                            fetch(window.location.href)
-                            .then(response => response.text())
-                            .then(html => {{
-                                let parser = new DOMParser();
-                                let doc = parser.parseFromString(html, 'text/html');
-                                document.getElementById('chat-section').innerHTML = doc.getElementById('chat-section').innerHTML;
-                                document.getElementById('alert-box').innerHTML = doc.getElementById('alert-box').innerHTML;
-                            }});
+                        if (!activeElement || activeElement.tagName !== 'INPUT' || activeElement.type !== 'text') {{
+                            fetch('/admin?pass={ADMIN_SECRET}&check_only=1')
+                            .then(response => response.json())
+                            .then(data => {{
+                                if (data.has_new) {{
+                                    location.reload(); // Ha új üzenet jött és nem gépelsz, frissítünk, hogy látsd
+                                }
+                            }}).catch(e => {{}});
                         }}
                     }}, 4000);
                 </script>
@@ -106,32 +103,6 @@ class SimpleServer(BaseHTTPRequestHandler):
             <body>
                 <h1>Lenner Gumiszerviz - Műhely Vezérlőpult</h1>
                 
-                <div id="alert-box">
-            """
-
-            if has_unread:
-                html += f"""
-                <audio id="alertSound" loop autoplay>
-                    <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
-                </audio>
-                <div style="background: #D35400; color: #fff; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-weight: bold; font-size: 18px; text-align: center;">
-                    ⚠️ ÚJ ÜZENET ÉRKEZETT! A riasztás szól, amíg rá nem kattintasz a nyugtázásra!
-                    <br><br>
-                    <a href="/admin?pass={ADMIN_SECRET}&action=ack">
-                        <button style="font-size: 16px; padding: 10px 20px; background: #fff; color: #000;">Riasztás elnémítása / Olvasottá tétel</button>
-                    </a>
-                </div>
-                <script>
-                    document.addEventListener('click', () => {
-                        var audio = document.getElementById('alertSound');
-                        if(audio) audio.play();
-                    }, { once: true });
-                </script>
-                """
-
-            html += f"""
-                </div>
-
                 <div class="card" id="chat-section">
                     <h2>Élő Chat & Válaszadás</h2>
                     <table>
@@ -177,6 +148,15 @@ class SimpleServer(BaseHTTPRequestHandler):
             </html>
             """
             self.wfile.write(html.encode('utf-8'))
+        
+        elif path == "/admin" and query.get("check_only"):
+            # Gyors JSON ellenőrző háttérkéréshez
+            chats = load_data(CHAT_FILE)
+            has_unread = any(not c.get("read", False) and c.get("sender") != "Lenner Műhely" for c in chats)
+            self.send_response(200)
+            self.send_header("Content-type", "application/json; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(json.dumps({"has_new": has_unread}).encode('utf-8'))
         else:
             self.send_response(404)
             self.end_headers()
@@ -235,6 +215,7 @@ class SimpleServer(BaseHTTPRequestHandler):
             chats = load_data(CHAT_FILE)
             user_messages = [c for c in chats if c.get("sender") == username or c.get("target") == username or c.get("sender") == "Lenner Műhely"]
             
+            self.send_response200 = True
             self.send_response(200)
             self.send_header("Content-type", "application/json; charset=utf-8")
             self.end_headers()
