@@ -26,6 +26,21 @@ class SimpleServer(BaseHTTPRequestHandler):
         path = parsed_path.path
         query = urllib.parse.parse_qs(parsed_path.query)
 
+        # 1. Háttér API végpont a chat üzenetek lekéréséhez (frissítés nélkül!)
+        if path == "/admin_api_messages":
+            password = query.get("pass", [""])[0]
+            if password != ADMIN_SECRET:
+                self.send_response(401)
+                self.end_headers()
+                return
+            chats = load_data(CHAT_FILE)
+            self.send_response(200)
+            self.send_header("Content-type", "application/json; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(json.dumps(chats, ensure_ascii=False).encode('utf-8'))
+            return
+
+        # 2. Admin felület főoldal és akciók
         if path == "/admin":
             password = query.get("pass", [""])[0]
             if password != ADMIN_SECRET:
@@ -83,9 +98,10 @@ class SimpleServer(BaseHTTPRequestHandler):
                     button {{ background: #FF8C00; color: #000; font-weight: bold; cursor: pointer; }}
                 </style>
                 <script>
-                    // Háttérben lekérdezzük az üzeneteket JSON-ben, amíg nem gépelsz a mezőbe
+                    // Háttérben 3 másodpercenként lekérdezzük az üzeneteket, és befrissítjük a táblázatot
                     setInterval(function() {{
                         let activeInput = document.activeElement;
+                        // Ha éppen beírsz valamit a válasz mezőbe, NEM frissítünk, hogy ne tűnjön el a szöveged!
                         if (activeInput && activeInput.tagName === 'INPUT' && activeInput.type === 'text') {{
                             return; 
                         }}
@@ -171,19 +187,6 @@ class SimpleServer(BaseHTTPRequestHandler):
             </html>
             """
             self.wfile.write(html.encode('utf-8'))
-
-        elif path == "/admin_api_messages":
-            password = query.get("pass", [""])[0]
-            if password != ADMIN_SECRET:
-                self.send_response(401)
-                self.end_headers()
-                return
-            chats = load_data(CHAT_FILE)
-            self.send_response(200)
-            self.send_header("Content-type", "application/json; charset=utf-8")
-            self.end_headers()
-            self.wfile.write(json.dumps(chats, ensure_ascii=False).encode('utf-8'))
-
         else:
             self.send_response(404)
             self.end_headers()
@@ -240,7 +243,7 @@ class SimpleServer(BaseHTTPRequestHandler):
         elif self.path == "/get_messages":
             username = data.get("username", "")
             chats = load_data(CHAT_FILE)
-            user_messages = [c for c in chats if c.get("sender") == username or c.get("target") == username or c.get("sender"] == "Lenner Műhely"]
+            user_messages = [c for c in chats if c.get("sender") == username or c.get("target"] == username or c.get("sender"] == "Lenner Műhely"]
             
             self.send_response(200)
             self.send_header("Content-type", "application/json; charset=utf-8")
