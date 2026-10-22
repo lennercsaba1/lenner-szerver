@@ -91,7 +91,7 @@ class SimpleServer(BaseHTTPRequestHandler):
                     input, button {{ padding: 8px; margin: 4px 0; background: #222; color: #fff; border: 1px solid #FF8C00; border-radius: 4px; }}
                     button {{ background: #FF8C00; color: #000; font-weight: bold; cursor: pointer; }}
 
-                    /* Jobb alsó sarok villogó értesítő ablak (~5cm x 1cm -> kb. 200px x 45px) */
+                    /* Jobb alsó sarok értesítő buborék (~5cm x 1cm -> kb. 200px x 45px) */
                     #float-notification {{
                         position: fixed;
                         bottom: 20px;
@@ -107,11 +107,13 @@ class SimpleServer(BaseHTTPRequestHandler):
                         font-weight: bold;
                         cursor: pointer;
                         box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-                        animation: blink 1s infinite;
                         z-index: 1000;
                         text-align: center;
-                        font-size: 13px;
+                        font-size: 14px;
                         padding: 5px;
+                    }}
+                    .blinking {{
+                        animation: blink 1s infinite;
                     }}
                     @keyframes blink {{
                         0% {{ opacity: 1; }}
@@ -119,10 +121,10 @@ class SimpleServer(BaseHTTPRequestHandler):
                         100% {{ opacity: 1; }}
                     }}
 
-                    /* Felugró Chat Ablak (~20cm x 20cm -> kb. 450px x 450px) */
+                    /* Felugró Chat Ablak (~20cm x 20cm -> kb. 450px x 480px), pontosan a buborék felett */
                     #chat-modal {{
                         position: fixed;
-                        bottom: 20px;
+                        bottom: 75px; /* A buborék felett helyezkedik el */
                         right: 20px;
                         width: 450px;
                         height: 480px;
@@ -173,7 +175,7 @@ class SimpleServer(BaseHTTPRequestHandler):
                 </style>
                 <script>
                     let currentChatUser = "";
-                    let lastMessageCount = 0;
+                    let isChatOpen = false;
 
                     // Háttérben ellenőrizzük az üzeneteket
                     setInterval(function() {{
@@ -185,41 +187,57 @@ class SimpleServer(BaseHTTPRequestHandler):
                             
                             if (unread.length > 0) {{
                                 let latest = unread[unread.length - 1];
-                                currentChatUser = latest.sender;
-                                notif.innerHTML = "Új üzenet: " + currentChatUser;
-                                notif.style.display = 'flex';
-                            }} else {{
-                                if (document.getElementById('chat-modal').style.display !== 'flex') {{
-                                    notif.style.display = 'none';
+                                if (!currentChatUser) {{
+                                    currentChatUser = latest.sender;
+                                }}
+                                // Ha még nem volt megnyitva, villog és mutatja az új üzenetet
+                                if (notif.style.display !== 'flex' && !isChatOpen) {{
+                                    notif.innerText = "Új üzenet: " + currentChatUser;
+                                    notif.classList.add('blinking');
+                                    notif.style.display = 'flex';
                                 }}
                             }}
 
                             // Ha nyitva van a chat ablak, frissítjük a buborékokat
-                            if (document.getElementById('chat-modal').style.display === 'flex' && currentChatUser) {{
+                            if (isChatOpen && currentChatUser) {{
                                 renderChatMessages(chats, currentChatUser);
                             }}
                         }}).catch(e => {{}});
                     }}, 3000);
 
-                    function openChat(username) {{
-                        if(!username) return;
-                        currentChatUser = username;
-                        document.getElementById('chat-title').innerText = "Chat: " + username;
-                        document.getElementById('float-notification').style.display = 'none';
-                        document.getElementById('chat-modal').style.display = 'flex';
-                        
-                        // Üzenetek olvasottá tétele a szerveren
-                        fetch('/admin_api_messages?pass={ADMIN_SECRET}')
-                        .then(res => res.json())
-                        .then(chats => {{
-                            renderChatMessages(chats, username);
-                            // Megjelöljük olvasottként
-                            fetch('/admin?pass={ADMIN_SECRET}&action=ack&user=' + encodeURIComponent(username));
-                        }});
+                    function handleNotificationClick() {{
+                        let notif = document.getElementById('float-notification');
+                        let modal = document.getElementById('chat-modal');
+
+                        if (isChatOpen) {{
+                            // Ha nyitva volt, kattintásra lecsukjuk a chatet, de a buborék marad
+                            modal.style.display = 'none';
+                            isChatOpen = false;
+                        }} else {{
+                            // Megnyitjuk: megszűnik a villogás, csak a név marad
+                            notif.classList.remove('blinking');
+                            notif.innerText = currentChatUser;
+                            modal.style.display = 'flex';
+                            isChatOpen = true;
+
+                            if(currentChatUser) {{
+                                document.getElementById('chat-title').innerText = "Chat: " + currentChatUser;
+                                fetch('/admin_api_messages?pass={ADMIN_SECRET}')
+                                .then(res => res.json())
+                                .then(chats => {{
+                                    renderChatMessages(chats, currentChatUser);
+                                    fetch('/admin?pass={ADMIN_SECRET}&action=ack&user=' + encodeURIComponent(currentChatUser));
+                                }});
+                            }}
+                        }}
                     }}
 
-                    function closeChat() {{
+                    function closeChatCompletely(event) {{
+                        event.stopPropagation(); // Ne hívja meg a buborék kattintást
                         document.getElementById('chat-modal').style.display = 'none';
+                        document.getElementById('float-notification').style.display = 'none';
+                        isChatOpen = false;
+                        currentChatUser = "";
                     }}
 
                     function renderChatMessages(chats, username) {{
@@ -245,7 +263,6 @@ class SimpleServer(BaseHTTPRequestHandler):
                         fetch('/admin?pass={ADMIN_SECRET}&action=reply&user=' + encodeURIComponent(currentChatUser) + '&text=' + encodeURIComponent(text))
                         .then(() => {{
                             input.value = '';
-                            // Azonnal frissítjük a nézetet
                             fetch('/admin_api_messages?pass={ADMIN_SECRET}')
                             .then(res => res.json())
                             .then(chats => renderChatMessages(chats, currentChatUser));
@@ -258,7 +275,7 @@ class SimpleServer(BaseHTTPRequestHandler):
                 
                 <div class="card">
                     <h2>Műhely Információk</h2>
-                    <p>A rendszer készen áll. Ha egy ügyfél üzenetet küld az Android applikációból, a jobb alsó sarokban megjelenik egy villogó értesítő ablak.</p>
+                    <p>A rendszer készen áll. Új üzenet érkezésekor a jobb alsó sarokban villogó buborék jelenik meg.</p>
                 </div>
 
                 <div class="card">
@@ -267,21 +284,21 @@ class SimpleServer(BaseHTTPRequestHandler):
                         <tr><th>Felhasználónév</th><th>Jelszó</th><th>Akció</th></tr>
             """
             for user, pwd in users.items():
-                html += f"<tr><td>{user}</td><td>{pwd}</td><td><button onclick=\"openChat('{user}')\">Üzenet küldése</button></td></tr>"
+                html += f"<tr><td>{user}</td><td>{pwd}</td><td><button onclick=\"currentChatUser='{user}'; document.getElementById('float-notification').innerText='{user}'; document.getElementById('float-notification').classList.remove('blinking'); document.getElementById('float-notification').style.display='flex'; document.getElementById('chat-modal').style.display='flex'; isChatOpen=true; document.getElementById('chat-title').innerText='Chat: {user}'; fetch('/admin_api_messages?pass={ADMIN_SECRET}').then(r=>r.json()).then(c=>renderChatMessages(c,'{user}'));\">Üzenet küldése</button></td></tr>"
             html += f"""
                     </table>
                 </div>
 
-                <!-- Jobb alsó sarok villogó értesítő -->
-                <div id="float-notification" onclick="openChat(currentChatUser)">
-                    Új üzenet érkezett!
+                <!-- Jobb alsó sarok értesítő buborék -->
+                <div id="float-notification" onclick="handleNotificationClick()">
+                    Új üzenet
                 </div>
 
-                <!-- Felugró Chat Párbeszéd Panel (~20x20 cm) -->
+                <!-- Felugró Chat Párbeszéd Panel közvetlenül a buborék felett -->
                 <div id="chat-modal">
                     <div id="chat-header">
                         <span id="chat-title">Chat</span>
-                        <button onclick="closeChat()" style="background: #444; color: #fff; padding: 2px 8px; margin:0;">X</button>
+                        <button onclick="closeChatCompletely(event)" style="background: #444; color: #fff; padding: 2px 8px; margin:0;">X</button>
                     </div>
                     <div id="chat-body">
                         <!-- Ide jönnek a buborékok -->
