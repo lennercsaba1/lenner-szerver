@@ -210,7 +210,6 @@ class SimpleServer(BaseHTTPRequestHandler):
                     let currentChatUser = "";
                     let isChatOpen = false;
 
-                    // Adatok betöltése localStorage-ból, hogy frissítés után is megmaradjon a memória
                     function getStorage(key) {{
                         try {{
                             return JSON.parse(localStorage.getItem(key)) || {{}};
@@ -227,8 +226,19 @@ class SimpleServer(BaseHTTPRequestHandler):
 
                     let userLastSeenCount = getStorage('userLastSeenCount');
                     let dismissedCountPerUser = getStorage('dismissedCountPerUser');
+                    let persistentBubbles = getStorage('persistentBubbles'); // Tárolja a KINT lévő buborékokat
 
-                    setInterval(function() {{
+                    // Betöltéskor azonnal kirakjuk a korábban már nyitva lévő buborékokat
+                    window.onload = function() {{
+                        for (let u in persistentBubbles) {{
+                            if (persistentBubbles[u]) {{
+                                createOrUpdateBubble(u, false);
+                            }}
+                        }}
+                        checkMessages();
+                    }};
+
+                    function checkMessages() {{
                         fetch('/admin_api_messages?pass={ADMIN_SECRET}')
                         .then(res => res.json())
                         .then(chats => {{
@@ -244,7 +254,7 @@ class SimpleServer(BaseHTTPRequestHandler):
                                 let count = userMessages[u].length;
                                 if (!(u in userLastSeenCount)) userLastSeenCount[u] = 0;
 
-                                // Csak akkor villog, ha VALÓBAN érkezett ÚJ üzenet a legutóbb látott óta
+                                // Ha valóban új üzenet jött
                                 if (count > userLastSeenCount[u] && count !== dismissedCountPerUser[u]) {{
                                     createOrUpdateBubble(u, true);
                                 }}
@@ -258,7 +268,9 @@ class SimpleServer(BaseHTTPRequestHandler):
                                 }}
                             }}
                         }}).catch(e => {{}});
-                    }}, 3000);
+                    }}
+
+                    setInterval(checkMessages, 3000);
 
                     function createOrUpdateBubble(username, isBlinking) {{
                         let container = document.getElementById('bubbles-container');
@@ -280,6 +292,9 @@ class SimpleServer(BaseHTTPRequestHandler):
                             bubble.innerText = username;
                             bubble.classList.remove('blinking');
                         }}
+
+                        persistentBubbles[username] = true;
+                        setStorage('persistentBubbles', persistentBubbles);
                     }}
 
                     function toggleUserChat(username) {{
@@ -336,6 +351,9 @@ class SimpleServer(BaseHTTPRequestHandler):
                         if (currentChatUser) {{
                             let bubble = document.getElementById('bubble-' + currentChatUser);
                             if (bubble) bubble.remove();
+
+                            delete persistentBubbles[currentChatUser];
+                            setStorage('persistentBubbles', persistentBubbles);
                             
                             fetch('/admin_api_messages?pass={ADMIN_SECRET}')
                             .then(res => res.json())
