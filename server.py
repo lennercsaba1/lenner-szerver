@@ -20,7 +20,10 @@ def save_data(file_path, data):
     with open(file_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
         f.flush()
-        os.fsync(f.fileno())
+        try:
+            os.fsync(f.fileno())
+        except:
+            pass
 
 class SimpleServer(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -72,26 +75,17 @@ class SimpleServer(BaseHTTPRequestHandler):
                 self.wfile.write(b"OK")
                 return
 
-            # Felhasználó ÉS a hozzá tartozó összes üzenet radikális törlése
+            # Felhasználó ÉS a hozzá tartozó összes üzenet törlése
             if action == "delete_user":
                 target_user = query.get("user", [""])[0]
                 if target_user:
-                    # 1. Felhasználó törlése a DB-ből
                     users = load_data(DB_FILE)
                     if target_user in users:
                         del users[target_user]
                         save_data(DB_FILE, users)
                     
-                    # 2. Összes üzenet radikális törlése, ami ehhez a felhasználóhoz kötődik
                     chats = load_data(CHAT_FILE)
-                    filtered_chats = []
-                    for c in chats:
-                        sender = c.get("sender", "")
-                        target = c.get("target", "")
-                        # Ha a küldő vagy a célzott ez a felhasználó, eldobjuk
-                        if sender != target_user and target != target_user:
-                            filtered_chats.append(c)
-                    
+                    filtered_chats = [c for c in chats if c.get("sender") != target_user and c.get("target") != target_user]
                     save_data(CHAT_FILE, filtered_chats)
                 
                 self.send_response(302)
@@ -99,9 +93,14 @@ class SimpleServer(BaseHTTPRequestHandler):
                 self.end_headers()
                 return
 
-            # Minden chatelőzmény törlése gomb akciója
-            if action == "clear_all_chats":
-                save_data(CHAT_FILE, [])
+            # CSAK AZ ADOTT FELHASZNÁLÓ CHATELŐZMÉNYEINEK TÖRLÉSE
+            if action == "clear_chat":
+                target_user = query.get("user", [""])[0]
+                if target_user:
+                    chats = load_data(CHAT_FILE)
+                    filtered_chats = [c for c in chats if c.get("sender") != target_user and c.get("target") != target_user]
+                    save_data(CHAT_FILE, filtered_chats)
+                
                 self.send_response(302)
                 self.send_header('Location', f'/admin?pass={ADMIN_SECRET}')
                 self.end_headers()
@@ -142,16 +141,17 @@ class SimpleServer(BaseHTTPRequestHandler):
                         background: #E74C3C;
                     }}
 
-                    .btn-clear-chats {{
+                    .btn-clear-chat {{
                         background: #8E44AD;
                         color: #fff;
                         border: none;
-                        padding: 10px 15px;
-                        font-weight: bold;
-                        border-radius: 6px;
+                        padding: 5px 10px;
+                        border-radius: 4px;
                         cursor: pointer;
+                        font-weight: bold;
+                        margin-right: 5px;
                     }}
-                    .btn-clear-chats:hover {{
+                    .btn-clear-chat:hover {{
                         background: #9B59B6;
                     }}
 
@@ -485,12 +485,17 @@ class SimpleServer(BaseHTTPRequestHandler):
                         }}
                     }}
 
-                    function confirmClearAllChats() {{
-                        if (confirm("Biztosan törölni szeretnéd az ÖSSZES chatelőzményt a rendszerből?")) {{
-                            localStorage.removeItem('persistentBubbles');
-                            localStorage.removeItem('userLastSeenCount');
-                            localStorage.removeItem('dismissedCountPerUser');
-                            window.location.href = '/admin?pass={ADMIN_SECRET}&action=clear_all_chats';
+                    function confirmClearChat(username) {{
+                        if (confirm("Biztosan törölni szeretnéd " + username + " összes chatelőzményét?")) {{
+                            let pB = getStorage('persistentBubbles');
+                            delete pB[username];
+                            setStorage('persistentBubbles', pB);
+
+                            let uLS = getStorage('userLastSeenCount');
+                            delete uLS[username];
+                            setStorage('userLastSeenCount', uLS);
+
+                            window.location.href = '/admin?pass={ADMIN_SECRET}&action=clear_chat&user=' + encodeURIComponent(username);
                         }}
                     }}
 
@@ -534,23 +539,23 @@ class SimpleServer(BaseHTTPRequestHandler):
             <body>
                 <div class="header-container">
                     <h1>Lenner Gumiszerviz - Műhely Vezérlőpult</h1>
-                    <div style="display: flex; gap: 10px;">
-                        <button class="btn-clear-chats" onclick="confirmClearAllChats()">Összes chat törlése</button>
-                        <button id="sound-btn" class="sound-toggle-btn" onclick="toggleSound()">🔊 Hang: BE</button>
-                    </div>
+                    <button id="sound-btn" class="sound-toggle-btn" onclick="toggleSound()">🔊 Hang: BE</button>
                 </div>
                 
                 <div class="card">
                     <h2>Regisztrált Felhasználók ({len(users)})</h2>
                     <table>
-                        <tr><th>Felhasználónév</th><th>Jelszó</th><th>Üzenet küldése</th><th style="text-align: right;">Törlés</th></tr>
+                        <tr><th>Felhasználónév</th><th>Jelszó</th><th>Üzenet küldése</th><th style="text-align: right;">Műveletek</th></tr>
             """
             for user, pwd in users.items():
                 html += f"""<tr>
                     <td>{user}</td>
                     <td>{pwd}</td>
                     <td><button onclick="createOrUpdateBubble('{user}', false); toggleUserChat('{user}');">Chat nyitása</button></td>
-                    <td style="text-align: right;"><button class="btn-delete" onclick="confirmDelete('{user}')">X Törlés</button></td>
+                    <td style="text-align: right;">
+                        <button class="btn-clear-chat" onclick="confirmClearChat('{user}')">Chat törlése</button>
+                        <button class="btn-delete" onclick="confirmDelete('{user}')">X Törlés</button>
+                    </td>
                 </tr>"""
             html += f"""
                     </table>
@@ -645,7 +650,7 @@ class SimpleServer(BaseHTTPRequestHandler):
             user_messages = [
                 c for c in chats 
                 if c.get("sender") == username or 
-                   (c.get("sender") == "Lenner Műhely" && c.get("target") == username)
+                   (c.get("sender") == "Lenner Műhely" and c.get("target") == username)
             ]
             
             self.send_response(200)
