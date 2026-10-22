@@ -70,14 +70,20 @@ class SimpleServer(BaseHTTPRequestHandler):
                 self.wfile.write(b"OK")
                 return
 
-            # Felhasználó törlése
+            # Felhasználó ÉS a hozzá tartozó összes üzenet törlése
             if action == "delete_user":
                 target_user = query.get("user", [""])[0]
                 if target_user:
+                    # 1. Felhasználó törlése a DB-ből
                     users = load_data(DB_FILE)
                     if target_user in users:
                         del users[target_user]
                         save_data(DB_FILE, users)
+                    
+                    # 2. Összes üzenet törlése, ami ehhez a felhasználóhoz kötődik
+                    chats = load_data(CHAT_FILE)
+                    filtered_chats = [c for c in chats if c.get("sender") != target_user and c.get("target") != target_user]
+                    save_data(CHAT_FILE, filtered_chats)
                 
                 self.send_response(302)
                 self.send_header('Location', f'/admin?pass={ADMIN_SECRET}')
@@ -240,7 +246,6 @@ class SimpleServer(BaseHTTPRequestHandler):
                     let dismissedCountPerUser = getStorage('dismissedCountPerUser');
                     let persistentBubbles = getStorage('persistentBubbles');
 
-                    // Beépített finom értesítési hang (Web Audio API)
                     function playNotificationSound() {{
                         if (!soundEnabled) return;
                         try {{
@@ -257,9 +262,8 @@ class SimpleServer(BaseHTTPRequestHandler):
 
                             let now = ctx.currentTime;
                             
-                            // Dupla lágy csipogás
-                            osc1.frequency.setValueAtTime(587.33, now); // D5 hang
-                            osc2.frequency.setValueAtTime(880, now + 0.12); // A5 hang
+                            osc1.frequency.setValueAtTime(587.33, now);
+                            osc2.frequency.setValueAtTime(880, now + 0.12);
 
                             gain.gain.setValueAtTime(0.15, now);
                             gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
@@ -283,7 +287,7 @@ class SimpleServer(BaseHTTPRequestHandler):
                             btn.innerText = "🔊 Hang: BE";
                             btn.style.borderColor = "#FF8C00";
                             btn.style.color = "#FF8C00";
-                            playNotificationSound(); // Teszt hang
+                            playNotificationSound();
                         }} else {{
                             btn.innerText = "🔇 Hang: KI";
                             btn.style.borderColor = "#777";
@@ -318,7 +322,6 @@ class SimpleServer(BaseHTTPRequestHandler):
                                 let count = userMessages[u].length;
                                 if (!(u in userLastSeenCount)) userLastSeenCount[u] = 0;
 
-                                // Új üzenet észlelése
                                 if (count > userLastSeenCount[u] && count !== dismissedCountPerUser[u]) {{
                                     createOrUpdateBubble(u, true);
                                     shouldPlaySound = true;
@@ -439,7 +442,16 @@ class SimpleServer(BaseHTTPRequestHandler):
                     }}
 
                     function confirmDelete(username) {{
-                        if (confirm("Biztosan szeretnéd törölni ezt a felhasználót (" + username + ")?")) {{
+                        if (confirm("Biztosan szeretnéd törölni ezt a felhasználót (" + username + ") és a hozzá tartozó összes üzenetet?")) {{
+                            // Töröljük a localStorage-ból is a maradványokat
+                            let pB = getStorage('persistentBubbles');
+                            delete pB[username];
+                            setStorage('persistentBubbles', pB);
+
+                            let uLS = getStorage('userLastSeenCount');
+                            delete uLS[username];
+                            setStorage('userLastSeenCount', uLS);
+
                             window.location.href = '/admin?pass={ADMIN_SECRET}&action=delete_user&user=' + encodeURIComponent(username);
                         }}
                     }}
@@ -592,7 +604,7 @@ class SimpleServer(BaseHTTPRequestHandler):
             user_messages = [
                 c for c in chats 
                 if c.get("sender") == username or 
-                   (c.get("sender") == "Lenner Műhely" and c.get("target") == username)
+                   (c.get("sender") == "Lenner Műhely" && c.get("target") == username)
             ]
             
             self.send_response(200)
