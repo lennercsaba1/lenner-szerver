@@ -350,9 +350,15 @@ class SimpleServer(BaseHTTPRequestHandler):
 
                             for (let u in userMessages) {{
                                 let count = userMessages[u].length;
-                                if (!(u in userLastSeenCount)) userLastSeenCount[u] = 0;
 
-                                if (count > userLastSeenCount[u] && count !== dismissedCountPerUser[u]) {{
+                                // Ha teljesen új felhasználó írt legelőször:
+                                if (!(u in userLastSeenCount)) {{
+                                    createOrUpdateBubble(u, true);
+                                    userLastSeenCount[u] = 0;
+                                    shouldPlaySound = true;
+                                }}
+                                // Ha már ismert felhasználónak jött új üzenete:
+                                else if (count > userLastSeenCount[u] && count !== dismissedCountPerUser[u]) {{
                                     createOrUpdateBubble(u, true);
                                     shouldPlaySound = true;
                                 }}
