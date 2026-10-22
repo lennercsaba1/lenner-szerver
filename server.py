@@ -118,7 +118,7 @@ class SimpleServer(BaseHTTPRequestHandler):
             <head>
                 <title>Lenner Műhely Admin Panel</title>
                 <style>
-                    body {{ font-family: Arial, sans-serif; background: #121212; color: #fff; padding: 20px; margin: 0; }}
+                    body {{ font-family: Arial; background: #121212; color: #fff; padding: 20px; margin: 0; }}
                     .header-container {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }}
                     h1, h2 {{ color: #FF8C00; margin: 0; }}
                     table {{ border-collapse: collapse; width: 100%; margin-bottom: 20px; background: #1E1E1E; }}
@@ -165,53 +165,46 @@ class SimpleServer(BaseHTTPRequestHandler):
                         cursor: pointer;
                     }}
 
-                    /* LÁTVÁNYOS, MODERN BUBORÉKOK ALUL */
                     #bubbles-container {{
                         position: fixed;
                         bottom: 20px;
                         right: 20px;
                         display: flex;
                         flex-direction: row-reverse;
-                        gap: 12px;
+                        gap: 10px;
                         z-index: 1000;
                     }}
 
                     .user-bubble {{
-                        min-width: 160px;
-                        padding: 10px 16px;
-                        background: #E67E22;
-                        color: #FFFFFF;
-                        border: 2px solid #FF8C00;
-                        border-radius: 12px;
+                        width: 180px;
+                        height: 45px;
+                        background: #D35400;
+                        color: #fff;
+                        border-radius: 8px;
                         display: flex;
                         align-items: center;
                         justify-content: center;
                         font-weight: bold;
                         cursor: pointer;
-                        box-shadow: 0 4px 15px rgba(255, 140, 0, 0.4);
+                        box-shadow: 0 4px 10px rgba(0,0,0,0.5);
                         text-align: center;
-                        font-size: 14px;
+                        font-size: 13px;
+                        padding: 5px;
                         box-sizing: border-box;
-                        transition: transform 0.2s;
-                    }}
-
-                    .user-bubble:hover {{
-                        transform: scale(1.05);
                     }}
 
                     .blinking {{
-                        background: #D35400 !important;
-                        border-color: #FF4500 !important;
-                        animation: blink 0.8s infinite alternate;
+                        animation: blink 1s infinite;
                     }}
                     @keyframes blink {{
-                        0% {{ opacity: 1; box-shadow: 0 0 10px #FF8C00; }}
-                        100% {{ opacity: 0.4; box-shadow: 0 0 25px #FF4500; }}
+                        0% {{ opacity: 1; }}
+                        50% {{ opacity: 0.3; }}
+                        100% {{ opacity: 1; }}
                     }}
 
                     #chat-modal {{
                         position: fixed;
-                        bottom: 80px;
+                        bottom: 75px;
                         right: 20px;
                         width: 450px;
                         height: 480px;
@@ -220,7 +213,7 @@ class SimpleServer(BaseHTTPRequestHandler):
                         border-radius: 10px;
                         display: none;
                         flex-direction: column;
-                        box-shadow: 0 5px 25px rgba(0,0,0,0.8);
+                        box-shadow: 0 5px 15px rgba(0,0,0,0.7);
                         z-index: 1001;
                     }}
                     #chat-header {{
@@ -357,9 +350,11 @@ class SimpleServer(BaseHTTPRequestHandler):
                             for (let u in userMessages) {{
                                 let count = userMessages[u].length;
 
+                                // Ha teljesen új felhasználó vagy több üzenete érkezett, mint amennyit utoljára láttunk
                                 if (!(u in userLastSeenCount) || count > userLastSeenCount[u]) {{
                                     createOrUpdateBubble(u, true);
                                     
+                                    // Ha a chat ablak épp NYITVA van nála, az üzeneteket látottnak tekintjük
                                     if (isChatOpen && currentChatUser === u) {{
                                         userLastSeenCount[u] = count;
                                     }} else {{
@@ -400,10 +395,10 @@ class SimpleServer(BaseHTTPRequestHandler):
                         }}
 
                         if (isBlinking && (!isChatOpen || currentChatUser !== username)) {{
-                            bubble.innerText = "💬 Új üzenet: " + username;
+                            bubble.innerText = "Új üzenet: " + username;
                             bubble.classList.add('blinking');
                         }} else {{
-                            bubble.innerText = "👤 " + username;
+                            bubble.innerText = username;
                             bubble.classList.remove('blinking');
                         }}
 
@@ -418,10 +413,7 @@ class SimpleServer(BaseHTTPRequestHandler):
                         if (isChatOpen && currentChatUser === username) {{
                             modal.style.display = 'none';
                             isChatOpen = false;
-                            if (bubble) {{
-                                bubble.innerText = "👤 " + username;
-                                bubble.classList.remove('blinking');
-                            }}
+                            if (bubble) bubble.classList.remove('blinking');
                         }} else {{
                             currentChatUser = username;
                             document.getElementById('chat-title').innerText = "Chat: " + username;
@@ -429,7 +421,7 @@ class SimpleServer(BaseHTTPRequestHandler):
                             isChatOpen = true;
 
                             if (bubble) {{
-                                bubble.innerText = "👤 " + username;
+                                bubble.innerText = username;
                                 bubble.classList.remove('blinking');
                             }}
 
