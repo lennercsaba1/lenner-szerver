@@ -5,7 +5,7 @@ import urllib.parse
 
 DB_FILE = "adatbazis.json"
 CHAT_FILE = "chat_uzenetek.json"
-LOG_FILE = "chat_naplo.json"  # Külön fájl a VÉGLEGES naplónak, amit a Chat törlése gomb NEM töröl
+LOG_FILE = "chat_naplo.json"
 ADMIN_SECRET = "lenneradmin123"
 
 def load_data(file_path):
@@ -113,7 +113,7 @@ class SimpleServer(BaseHTTPRequestHandler):
                 self.end_headers()
                 return
 
-            # CSAK AZ ADOTT FELHASZNÁLÓ CHATELŐZMÉNYEINEK TÖRLÉSE (A naplóból NEM törlődik!)
+            # CSAK AZ ADOTT FELHASZNÁLÓ CHATELŐZMÉNYEINEK TÖRLÉSE
             if action == "clear_chat":
                 target_user = query.get("user", [""])[0]
                 if target_user:
@@ -204,7 +204,7 @@ class SimpleServer(BaseHTTPRequestHandler):
                         position: fixed;
                         top: 20px;
                         right: 20px;
-                        width: 420px;
+                        width: 440px;
                         height: calc(100vh - 100px);
                         background: #1A1A1A;
                         border: 2px solid #FF8C00;
@@ -231,7 +231,21 @@ class SimpleServer(BaseHTTPRequestHandler):
                         overflow-y: auto;
                         display: flex;
                         flex-direction: column;
-                        gap: 12px;
+                        gap: 15px;
+                    }}
+                    .log-user-group {{
+                        background: #222;
+                        border: 1px solid #444;
+                        border-radius: 6px;
+                        padding: 10px;
+                    }}
+                    .log-user-title {{
+                        color: #FF8C00;
+                        font-weight: bold;
+                        font-size: 14px;
+                        margin-bottom: 8px;
+                        border-bottom: 1px solid #444;
+                        padding-bottom: 4px;
                     }}
 
                     #bubbles-container {{
@@ -307,8 +321,9 @@ class SimpleServer(BaseHTTPRequestHandler):
                     .message-bubble {{
                         padding: 8px 12px;
                         border-radius: 6px;
-                        max-width: 80%;
+                        max-width: 85%;
                         font-size: 14px;
+                        margin-bottom: 6px;
                     }}
                     .msg-user {{ background: #333; align-self: flex-start; }}
                     .msg-admin {{ background: #FF8C00; color: #000; align-self: flex-end; font-weight: bold; }}
@@ -525,7 +540,6 @@ class SimpleServer(BaseHTTPRequestHandler):
                         }}
                     }}
 
-                    /* NAPLÓZOTT BESZÉLGETÉSEK SÁV NYITÁSA / ZÁRÁSA */
                     function toggleLoggedChats() {{
                         let sidebar = document.getElementById('log-sidebar');
                         if (sidebar.style.display === 'flex') {{
@@ -536,6 +550,7 @@ class SimpleServer(BaseHTTPRequestHandler):
                         }}
                     }}
 
+                    /* ÜZENETEK CSOPORTOSÍTÁSA FELHASZNÁLÓK SZERINT A NAPLÓBAN */
                     function loadLoggedChats() {{
                         fetch('/admin_api_logs?pass={ADMIN_SECRET}')
                         .then(res => res.json())
@@ -545,18 +560,34 @@ class SimpleServer(BaseHTTPRequestHandler):
                             if (logs.length === 0) {{
                                 html = '<div style="color: #888; text-align: center; margin-top: 20px;">Nincsenek még naplózott üzenetek.</div>';
                             }} else {{
+                                // Üzenetek szétválogatása ügyfélnevek szerint
+                                let grouped = {{}};
                                 logs.forEach(msg => {{
-                                    let isMe = (msg.sender === "Lenner Műhely");
-                                    let senderLabel = isMe ? "Lenner Műhely ➔ " + (msg.target || "Ügyfél") : msg.sender;
-                                    let bubbleClass = isMe ? "msg-admin" : "msg-user";
-                                    html += `<div style="margin-bottom: 8px;">
-                                        <small style="display:block; font-size:11px; color:#FF8C00; font-weight:bold;">${{senderLabel}}</small>
-                                        <div class="message-bubble ${{bubbleClass}}" style="max-width: 100%;">${{msg.text}}</div>
-                                    </div>`;
+                                    let client = (msg.sender === "Lenner Műhely") ? msg.target : msg.sender;
+                                    if (!client) client = "Ismeretlen";
+                                    if (!grouped[client]) grouped[client] = [];
+                                    grouped[client].push(msg);
                                 }});
+
+                                // HTML generálása ügyfélcsoportonként
+                                for (let client in grouped) {{
+                                    html += `<div class="log-user-group">
+                                        <div class="log-user-title">👤 Ügyfél: ${{client}}</div>`;
+                                    
+                                    grouped[client].forEach(msg => {{
+                                        let isMe = (msg.sender === "Lenner Műhely");
+                                        let bubbleClass = isMe ? "msg-admin" : "msg-user";
+                                        let senderLabel = isMe ? "Lenner Műhely" : msg.sender;
+                                        html += `<div>
+                                            <small style="display:block; font-size:10px; opacity:0.7;">${{senderLabel}}</small>
+                                            <div class="message-bubble ${{bubbleClass}}">${{msg.text}}</div>
+                                        </div>`;
+                                    }});
+                                    
+                                    html += `</div>`;
+                                }}
                             }}
                             body.innerHTML = html;
-                            body.scrollTop = body.scrollHeight;
                         }});
                     }}
 
@@ -658,7 +689,7 @@ class SimpleServer(BaseHTTPRequestHandler):
                 <!-- JOBB OLDALI NAPLÓZOTT BESZÉLGETÉS SÁV -->
                 <div id="log-sidebar">
                     <div id="log-header">
-                        <span>Minden naplózott beszélgetés</span>
+                        <span>Minden naplózott beszélgetés (Ügyfélenként)</span>
                         <button onclick="toggleLoggedChats()" style="background: #444; color: #fff; padding: 2px 8px; margin:0;">X</button>
                     </div>
                     <div id="log-body"></div>
@@ -742,7 +773,6 @@ class SimpleServer(BaseHTTPRequestHandler):
             chats.append(data)
             save_data(CHAT_FILE, chats)
 
-            # Mentés az örök naplóba is
             logs = load_data(LOG_FILE)
             if not isinstance(logs, list):
                 logs = []
