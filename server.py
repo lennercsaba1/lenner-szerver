@@ -97,7 +97,8 @@ class SimpleServer(BaseHTTPRequestHandler):
                 <title>Lenner Műhely Admin Panel</title>
                 <style>
                     body {{ font-family: Arial; background: #121212; color: #fff; padding: 20px; margin: 0; }}
-                    h1, h2 {{ color: #FF8C00; }}
+                    .header-container {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }}
+                    h1, h2 {{ color: #FF8C00; margin: 0; }}
                     table {{ border-collapse: collapse; width: 100%; margin-bottom: 20px; background: #1E1E1E; }}
                     th, td {{ border: 1px solid #444; padding: 10px; text-align: left; }}
                     th {{ background: #222; }}
@@ -116,6 +117,16 @@ class SimpleServer(BaseHTTPRequestHandler):
                     }}
                     .btn-delete:hover {{
                         background: #E74C3C;
+                    }}
+
+                    .sound-toggle-btn {{
+                        background: #222;
+                        color: #FF8C00;
+                        border: 1px solid #FF8C00;
+                        padding: 8px 15px;
+                        font-weight: bold;
+                        border-radius: 6px;
+                        cursor: pointer;
                     }}
 
                     #bubbles-container {{
@@ -209,6 +220,7 @@ class SimpleServer(BaseHTTPRequestHandler):
                 <script>
                     let currentChatUser = "";
                     let isChatOpen = false;
+                    let soundEnabled = true;
 
                     function getStorage(key) {{
                         try {{
@@ -226,9 +238,59 @@ class SimpleServer(BaseHTTPRequestHandler):
 
                     let userLastSeenCount = getStorage('userLastSeenCount');
                     let dismissedCountPerUser = getStorage('dismissedCountPerUser');
-                    let persistentBubbles = getStorage('persistentBubbles'); // Tárolja a KINT lévő buborékokat
+                    let persistentBubbles = getStorage('persistentBubbles');
 
-                    // Betöltéskor azonnal kirakjuk a korábban már nyitva lévő buborékokat
+                    // Beépített finom értesítési hang (Web Audio API)
+                    function playNotificationSound() {{
+                        if (!soundEnabled) return;
+                        try {{
+                            let AudioContext = window.AudioContext || window.webkitAudioContext;
+                            if (!AudioContext) return;
+                            let ctx = new AudioContext();
+                            
+                            let osc1 = ctx.createOscillator();
+                            let osc2 = ctx.createOscillator();
+                            let gain = ctx.createGain();
+
+                            osc1.type = 'sine';
+                            osc2.type = 'sine';
+
+                            let now = ctx.currentTime;
+                            
+                            // Dupla lágy csipogás
+                            osc1.frequency.setValueAtTime(587.33, now); // D5 hang
+                            osc2.frequency.setValueAtTime(880, now + 0.12); // A5 hang
+
+                            gain.gain.setValueAtTime(0.15, now);
+                            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+
+                            osc1.connect(gain);
+                            osc2.connect(gain);
+                            gain.connect(ctx.destination);
+
+                            osc1.start(now);
+                            osc1.stop(now + 0.12);
+
+                            osc2.start(now + 0.12);
+                            osc2.stop(now + 0.35);
+                        }} catch(e) {{}}
+                    }}
+
+                    function toggleSound() {{
+                        soundEnabled = !soundEnabled;
+                        let btn = document.getElementById('sound-btn');
+                        if (soundEnabled) {{
+                            btn.innerText = "🔊 Hang: BE";
+                            btn.style.borderColor = "#FF8C00";
+                            btn.style.color = "#FF8C00";
+                            playNotificationSound(); // Teszt hang
+                        }} else {{
+                            btn.innerText = "🔇 Hang: KI";
+                            btn.style.borderColor = "#777";
+                            btn.style.color = "#777";
+                        }}
+                    }}
+
                     window.onload = function() {{
                         for (let u in persistentBubbles) {{
                             if (persistentBubbles[u]) {{
@@ -250,14 +312,21 @@ class SimpleServer(BaseHTTPRequestHandler):
                                 }}
                             }});
 
+                            let shouldPlaySound = false;
+
                             for (let u in userMessages) {{
                                 let count = userMessages[u].length;
                                 if (!(u in userLastSeenCount)) userLastSeenCount[u] = 0;
 
-                                // Ha valóban új üzenet jött
+                                // Új üzenet észlelése
                                 if (count > userLastSeenCount[u] && count !== dismissedCountPerUser[u]) {{
                                     createOrUpdateBubble(u, true);
+                                    shouldPlaySound = true;
                                 }}
+                            }}
+
+                            if (shouldPlaySound) {{
+                                playNotificationSound();
                             }}
 
                             if (isChatOpen && currentChatUser) {{
@@ -413,7 +482,10 @@ class SimpleServer(BaseHTTPRequestHandler):
                 </script>
             </head>
             <body>
-                <h1>Lenner Gumiszerviz - Műhely Vezérlőpult</h1>
+                <div class="header-container">
+                    <h1>Lenner Gumiszerviz - Műhely Vezérlőpult</h1>
+                    <button id="sound-btn" class="sound-toggle-btn" onclick="toggleSound()">🔊 Hang: BE</button>
+                </div>
                 
                 <div class="card">
                     <h2>Regisztrált Felhasználók ({len(users)})</h2>
