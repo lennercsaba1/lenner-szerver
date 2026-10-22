@@ -176,23 +176,24 @@ class SimpleServer(BaseHTTPRequestHandler):
                 <script>
                     let currentChatUser = "";
                     let isChatOpen = false;
-                    let lastKnownMessageCount = 0;
+                    let lastSeenTotalMessages = -1;
+                    let dismissedForThisCount = -1; // Ezzel szűrjük, hogy ha kiikszelted/lecsuktad, ne jöjjön vissza ugyanannyi üzenettel
 
                     // Háttérben ellenőrizzük az üzeneteket
                     setInterval(function() {{
                         fetch('/admin_api_messages?pass={ADMIN_SECRET}')
                         .then(res => res.json())
                         .then(chats => {{
-                            let unread = chats.filter(c => !c.read && c.sender !== "Lenner Műhely");
-                            let notif = document.getElementById('float-notification');
-                            
-                            // Ha teljesen új üzenet érkezett (több üzenet van, mint előtte, vagy van olvasatlan)
-                            if (unread.length > 0) {{
-                                let latest = unread[unread.length - 1];
-                                
-                                // Ha új felhasználó írt, vagy új üzenet jött be, miközben le volt csukva
-                                if (latest.sender !== currentChatUser || !isChatOpen) {{
-                                    currentChatUser = latest.sender;
+                            let clientMessages = chats.filter(c => c.sender !== "Lenner Műhely");
+                            if (clientMessages.length === 0) return;
+
+                            let latest = clientMessages[clientMessages.length - 1];
+                            currentChatUser = latest.sender;
+
+                            // Ha több üzenet van összesen, mint amikor utoljára láttuk / bezártuk
+                            if (chats.length > lastSeenTotalMessages) {{
+                                if (chats.length !== dismissedForThisCount) {{
+                                    let notif = document.getElementById('float-notification');
                                     if (!isChatOpen) {{
                                         notif.innerText = "Új üzenet: " + currentChatUser;
                                         notif.classList.add('blinking');
@@ -213,11 +214,17 @@ class SimpleServer(BaseHTTPRequestHandler):
                         let modal = document.getElementById('chat-modal');
 
                         if (isChatOpen) {{
-                            // Lecsukás: elrejtjük az ablakot, de a buborék ott marad névvel (nem villog)
+                            // Lecsukás alulra: marad a buborék névvel, de nem villog többé ehhez az üzenethez
                             modal.style.display = 'none';
                             isChatOpen = false;
                             
-                            // Olvasottá tesszük a szerveren, hogy ne villogjon újra, amíg nem jön új üzenet
+                            fetch('/admin_api_messages?pass={ADMIN_SECRET}')
+                            .then(res => res.json())
+                            .then(chats => {{
+                                lastSeenTotalMessages = chats.length;
+                                dismissedForThisCount = chats.length;
+                            }});
+
                             if (currentChatUser) {{
                                 fetch('/admin?pass={ADMIN_SECRET}&action=ack&user=' + encodeURIComponent(currentChatUser));
                             }}
@@ -228,15 +235,14 @@ class SimpleServer(BaseHTTPRequestHandler):
                             modal.style.display = 'flex';
                             isChatOpen = true;
 
-                            if(currentChatUser) {{
-                                document.getElementById('chat-title').innerText = "Chat: " + currentChatUser;
-                                fetch('/admin_api_messages?pass={ADMIN_SECRET}')
-                                .then(res => res.json())
-                                .then(chats => {{
-                                    renderChatMessages(chats, currentChatUser);
-                                    fetch('/admin?pass={ADMIN_SECRET}&action=ack&user=' + encodeURIComponent(currentChatUser));
-                                }});
-                            }}
+                            fetch('/admin_api_messages?pass={ADMIN_SECRET}')
+                            .then(res => res.json())
+                            .then(chats => {{
+                                lastSeenTotalMessages = chats.length;
+                                dismissedForThisCount = chats.length;
+                                renderChatMessages(chats, currentChatUser);
+                                fetch('/admin?pass={ADMIN_SECRET}&action=ack&user=' + encodeURIComponent(currentChatUser));
+                            }});
                         }}
                     }}
 
@@ -245,10 +251,17 @@ class SimpleServer(BaseHTTPRequestHandler):
                         document.getElementById('chat-modal').style.display = 'none';
                         document.getElementById('float-notification').style.display = 'none';
                         isChatOpen = false;
-                        if (currentChatUser) {{
-                            fetch('/admin?pass={ADMIN_SECRET}&action=ack&user=' + encodeURIComponent(currentChatUser));
-                        }}
-                        currentChatUser = "";
+
+                        fetch('/admin_api_messages?pass={ADMIN_SECRET}')
+                        .then(res => res.json())
+                        .then(chats => {{
+                            lastSeenTotalMessages = chats.length;
+                            dismissedForThisCount = chats.length;
+                            if (currentChatUser) {{
+                                fetch('/admin?pass={ADMIN_SECRET}&action=ack&user=' + encodeURIComponent(currentChatUser));
+                            }}
+                            currentChatUser = "";
+                        }});
                     }}
 
                     function renderChatMessages(chats, username) {{
@@ -276,7 +289,11 @@ class SimpleServer(BaseHTTPRequestHandler):
                             input.value = '';
                             fetch('/admin_api_messages?pass={ADMIN_SECRET}')
                             .then(res => res.json())
-                            .then(chats => renderChatMessages(chats, currentChatUser));
+                            .then(chats => {{
+                                lastSeenTotalMessages = chats.length;
+                                dismissedForThisCount = chats.length;
+                                renderChatMessages(chats, currentChatUser);
+                            }});
                         }});
                     }}
                 </script>
@@ -295,7 +312,7 @@ class SimpleServer(BaseHTTPRequestHandler):
                         <tr><th>Felhasználónév</th><th>Jelszó</th><th>Akció</th></tr>
             """
             for user, pwd in users.items():
-                html += f"<tr><td>{user}</td><td>{pwd}</td><td><button onclick=\"currentChatUser='{user}'; document.getElementById('float-notification').innerText='{user}'; document.getElementById('float-notification').classList.remove('blinking'); document.getElementById('float-notification').style.display='flex'; document.getElementById('chat-modal').style.display='flex'; isChatOpen=true; document.getElementById('chat-title').innerText='Chat: {user}'; fetch('/admin_api_messages?pass={ADMIN_SECRET}').then(r=>r.json()).then(c=>renderChatMessages(c,'{user}')); fetch('/admin?pass={ADMIN_SECRET}&action=ack&user={user}');\">Üzenet küldése</button></td></tr>"
+                html += f"<tr><td>{user}</td><td>{pwd}</td><td><button onclick=\"currentChatUser='{user}'; document.getElementById('float-notification').innerText='{user}'; document.getElementById('float-notification').classList.remove('blinking'); document.getElementById('float-notification').style.display='flex'; document.getElementById('chat-modal').style.display='flex'; isChatOpen=true; document.getElementById('chat-title').innerText='Chat: {user}'; fetch('/admin_api_messages?pass={ADMIN_SECRET}').then(r=>r.json()).then(c=>{{ lastSeenTotalMessages=c.length; dismissedForThisCount=c.length; renderChatMessages(c,'{user}'); }}); fetch('/admin?pass={ADMIN_SECRET}&action=ack&user={user}');\">Üzenet küldése</button></td></tr>"
             html += f"""
                     </table>
                 </div>
@@ -392,7 +409,7 @@ class SimpleServer(BaseHTTPRequestHandler):
         elif self.path == "/get_messages":
             username = data.get("username", "")
             chats = load_data(CHAT_FILE)
-            user_messages = [c for c in chats if c.get("sender") == username or c.get("target") == username or c.get("sender"] == "Lenner Műhely"]
+            user_messages = [c for c in chats if c.get("sender") == username or c.get("target"] == username or c.get("sender"] == "Lenner Műhely"]
             
             self.send_response(200)
             self.send_header("Content-type", "application/json; charset=utf-8")
