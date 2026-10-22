@@ -19,6 +19,8 @@ def load_data(file_path):
 def save_data(file_path, data):
     with open(file_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
+        f.flush()
+        os.fsync(f.fileno())
 
 class SimpleServer(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -70,19 +72,26 @@ class SimpleServer(BaseHTTPRequestHandler):
                 self.wfile.write(b"OK")
                 return
 
-            # Felhasználó ÉS a hozzá tartozó összes üzenet törlése
+            # Felhasználó ÉS a hozzá tartozó összes üzenet radikális törlése
             if action == "delete_user":
                 target_user = query.get("user", [""])[0]
                 if target_user:
-                    # 1. Felhasználó törlése a DB-ből
+                    # 1. Törlés a felhasználói adatbázisból
                     users = load_data(DB_FILE)
                     if target_user in users:
                         del users[target_user]
                         save_data(DB_FILE, users)
                     
-                    # 2. Összes üzenet törlése, ami ehhez a felhasználóhoz kötődik
+                    # 2. Törlés a chat üzenetekből (kizárólag a nem erre a userre vonatkozókat tartjuk meg)
                     chats = load_data(CHAT_FILE)
-                    filtered_chats = [c for c in chats if c.get("sender") != target_user and c.get("target") != target_user]
+                    filtered_chats = []
+                    for c in chats:
+                        sender = c.get("sender", "")
+                        target = c.get("target", "")
+                        # Ha a küldő vagy a célzott ez a felhasználó, akkor eldobjuk
+                        if sender != target_user and target != target_user:
+                            filtered_chats.append(c)
+                    
                     save_data(CHAT_FILE, filtered_chats)
                 
                 self.send_response(302)
@@ -442,8 +451,7 @@ class SimpleServer(BaseHTTPRequestHandler):
                     }}
 
                     function confirmDelete(username) {{
-                        if (confirm("Biztosan szeretnéd törölni ezt a felhasználót (" + username + ") és a hozzá tartozó összes üzenetet?")) {{
-                            // Töröljük a localStorage-ból is a maradványokat
+                        if (confirm("Biztosan szeretnéd törölni ezt a felhasználót (" + username + ") és minden üzenetét?")) {{
                             let pB = getStorage('persistentBubbles');
                             delete pB[username];
                             setStorage('persistentBubbles', pB);
