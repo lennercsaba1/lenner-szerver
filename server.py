@@ -231,21 +231,7 @@ class SimpleServer(BaseHTTPRequestHandler):
                         overflow-y: auto;
                         display: flex;
                         flex-direction: column;
-                        gap: 15px;
-                    }}
-                    .log-user-group {{
-                        background: #222;
-                        border: 1px solid #444;
-                        border-radius: 6px;
-                        padding: 10px;
-                    }}
-                    .log-user-title {{
-                        color: #FF8C00;
-                        font-weight: bold;
-                        font-size: 14px;
-                        margin-bottom: 8px;
-                        border-bottom: 1px solid #444;
-                        padding-bottom: 4px;
+                        gap: 10px;
                     }}
 
                     #bubbles-container {{
@@ -339,6 +325,7 @@ class SimpleServer(BaseHTTPRequestHandler):
                 </style>
                 <script>
                     let currentChatUser = "";
+                    let currentLogUser = ""; // Tároljuk, hogy melyik ügyfél naplója van megnyitva
                     let isChatOpen = false;
                     let soundEnabled = true;
 
@@ -460,8 +447,8 @@ class SimpleServer(BaseHTTPRequestHandler):
                             }}
 
                             let logSidebar = document.getElementById('log-sidebar');
-                            if (logSidebar.style.display === 'flex') {{
-                                loadLoggedChats();
+                            if (logSidebar.style.display === 'flex' && currentLogUser) {{
+                                loadLoggedChats(currentLogUser);
                             }}
                         }}).catch(e => {{}});
                     }}
@@ -540,54 +527,47 @@ class SimpleServer(BaseHTTPRequestHandler):
                         }}
                     }}
 
-                    function toggleLoggedChats() {{
+                    /* NAPLÓZOTT BESZÉLGETÉS SÁV NYITÁSA ADOTT ÜGYFÉLRE SZŰRVE */
+                    function toggleLoggedChats(username) {{
                         let sidebar = document.getElementById('log-sidebar');
-                        if (sidebar.style.display === 'flex') {{
+                        
+                        // Ha ugyanazt az ügyfelet nyitjuk meg újra, vagy bezárjuk
+                        if (sidebar.style.display === 'flex' && currentLogUser === username) {{
                             sidebar.style.display = 'none';
+                            currentLogUser = "";
                         }} else {{
+                            currentLogUser = username;
+                            document.getElementById('log-title').innerText = "Napló: " + username;
                             sidebar.style.display = 'flex';
-                            loadLoggedChats();
+                            loadLoggedChats(username);
                         }}
                     }}
 
-                    /* ÜZENETEK CSOPORTOSÍTÁSA FELHASZNÁLÓK SZERINT A NAPLÓBAN */
-                    function loadLoggedChats() {{
+                    function loadLoggedChats(username) {{
                         fetch('/admin_api_logs?pass={ADMIN_SECRET}')
                         .then(res => res.json())
                         .then(logs => {{
                             let body = document.getElementById('log-body');
                             let html = '';
-                            if (logs.length === 0) {{
-                                html = '<div style="color: #888; text-align: center; margin-top: 20px;">Nincsenek még naplózott üzenetek.</div>';
-                            }} else {{
-                                // Üzenetek szétválogatása ügyfélnevek szerint
-                                let grouped = {{}};
-                                logs.forEach(msg => {{
-                                    let client = (msg.sender === "Lenner Műhely") ? msg.target : msg.sender;
-                                    if (!client) client = "Ismeretlen";
-                                    if (!grouped[client]) grouped[client] = [];
-                                    grouped[client].push(msg);
-                                }});
+                            
+                            // Szűrés CSAK az adott ügyfél üzeneteire
+                            let userLogs = logs.filter(msg => msg.sender === username || msg.target === username);
 
-                                // HTML generálása ügyfélcsoportonként
-                                for (let client in grouped) {{
-                                    html += `<div class="log-user-group">
-                                        <div class="log-user-title">👤 Ügyfél: ${{client}}</div>`;
-                                    
-                                    grouped[client].forEach(msg => {{
-                                        let isMe = (msg.sender === "Lenner Műhely");
-                                        let bubbleClass = isMe ? "msg-admin" : "msg-user";
-                                        let senderLabel = isMe ? "Lenner Műhely" : msg.sender;
-                                        html += `<div>
-                                            <small style="display:block; font-size:10px; opacity:0.7;">${{senderLabel}}</small>
-                                            <div class="message-bubble ${{bubbleClass}}">${{msg.text}}</div>
-                                        </div>`;
-                                    }});
-                                    
-                                    html += `</div>`;
-                                }}
+                            if (userLogs.length === 0) {{
+                                html = '<div style="color: #888; text-align: center; margin-top: 20px;">Nincsenek még naplózott üzenetek ehhez a felhasználóhoz.</div>';
+                            }} else {{
+                                userLogs.forEach(msg => {{
+                                    let isMe = (msg.sender === "Lenner Műhely");
+                                    let bubbleClass = isMe ? "msg-admin" : "msg-user";
+                                    let senderLabel = isMe ? "Lenner Műhely" : msg.sender;
+                                    html += `<div>
+                                        <small style="display:block; font-size:10px; opacity:0.7;">${{senderLabel}}</small>
+                                        <div class="message-bubble ${{bubbleClass}}">${{msg.text}}</div>
+                                    </div>`;
+                                }});
                             }}
                             body.innerHTML = html;
+                            body.scrollTop = body.scrollHeight;
                         }});
                     }}
 
@@ -650,8 +630,8 @@ class SimpleServer(BaseHTTPRequestHandler):
                                 setStorage('userLastSeenCount', userLastSeenCount);
                                 renderChatMessages(chats, currentChatUser);
                                 let logSidebar = document.getElementById('log-sidebar');
-                                if (logSidebar.style.display === 'flex') {{
-                                    loadLoggedChats();
+                                if (logSidebar.style.display === 'flex' && currentLogUser === currentChatUser) {{
+                                    loadLoggedChats(currentLogUser);
                                 }}
                             }});
                         }});
@@ -675,7 +655,7 @@ class SimpleServer(BaseHTTPRequestHandler):
                     <td>{pwd}</td>
                     <td>
                         <button onclick="createOrUpdateBubble('{user}', false); toggleUserChat('{user}');">Chat nyitása</button>
-                        <button class="btn-log" onclick="toggleLoggedChats()">Naplózott beszélgetés</button>
+                        <button class="btn-log" onclick="toggleLoggedChats('{user}')">Naplózott beszélgetés</button>
                     </td>
                     <td style="text-align: right;">
                         <button class="btn-clear-chat" onclick="confirmClearChat('{user}')">Chat törlése</button>
@@ -689,8 +669,8 @@ class SimpleServer(BaseHTTPRequestHandler):
                 <!-- JOBB OLDALI NAPLÓZOTT BESZÉLGETÉS SÁV -->
                 <div id="log-sidebar">
                     <div id="log-header">
-                        <span>Minden naplózott beszélgetés (Ügyfélenként)</span>
-                        <button onclick="toggleLoggedChats()" style="background: #444; color: #fff; padding: 2px 8px; margin:0;">X</button>
+                        <span id="log-title">Naplózott beszélgetés</span>
+                        <button onclick="let sb=document.getElementById('log-sidebar'); sb.style.display='none'; currentLogUser='';" style="background: #444; color: #fff; padding: 2px 8px; margin:0;">X</button>
                     </div>
                     <div id="log-body"></div>
                 </div>
@@ -790,7 +770,7 @@ class SimpleServer(BaseHTTPRequestHandler):
             user_messages = [
                 c for c in chats 
                 if c.get("sender") == username or 
-                   (c.get("sender") == "Lenner Műhely" and c.get("target") == username)
+                   (c.get("sender") == "Lenner Műhely" && c.get("target") == username)
             ]
             
             self.send_response(200)
