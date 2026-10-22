@@ -5,6 +5,7 @@ import urllib.parse
 
 DB_FILE = "adatbazis.json"
 CHAT_FILE = "chat_uzenetek.json"
+LOG_FILE = "chat_naplo.json"  # Külön fájl a VÉGLEGES naplónak, amit a Chat törlése gomb NEM töröl
 ADMIN_SECRET = "lenneradmin123"
 
 def load_data(file_path):
@@ -45,6 +46,20 @@ class SimpleServer(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps(chats, ensure_ascii=False).encode('utf-8'))
             return
 
+        # 1.B Háttér API végpont a naplózott (örök) üzenetek lekéréséhez
+        if path == "/admin_api_logs":
+            password = query.get("pass", [""])[0]
+            if password != ADMIN_SECRET:
+                self.send_response(401)
+                self.end_headers()
+                return
+            logs = load_data(LOG_FILE)
+            self.send_response(200)
+            self.send_header("Content-type", "application/json; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(json.dumps(logs, ensure_ascii=False).encode('utf-8'))
+            return
+
         # 2. Admin felület főoldal és akciók
         if path == "/admin":
             password = query.get("pass", [""])[0]
@@ -61,21 +76,26 @@ class SimpleServer(BaseHTTPRequestHandler):
                 target_user = query.get("user", [""])[0]
                 reply_text = query.get("text", [""])[0]
                 if target_user and reply_text:
-                    chats = load_data(CHAT_FILE)
-                    chats.append({
+                    new_msg = {
                         "sender": "Lenner Műhely",
                         "target": target_user,
                         "text": reply_text,
                         "read": True
-                    })
+                    }
+                    chats = load_data(CHAT_FILE)
+                    chats.append(new_msg)
                     save_data(CHAT_FILE, chats)
+
+                    logs = load_data(LOG_FILE)
+                    logs.append(new_msg)
+                    save_data(LOG_FILE, logs)
                 
                 self.send_response(200)
                 self.end_headers()
                 self.wfile.write(b"OK")
                 return
 
-            # Teljes felhasználó törlése (Fiók + Üzenetek)
+            # Felhasználó ÉS a hozzá tartozó összes üzenet törlése
             if action == "delete_user":
                 target_user = query.get("user", [""])[0]
                 if target_user:
@@ -84,6 +104,19 @@ class SimpleServer(BaseHTTPRequestHandler):
                         del users[target_user]
                         save_data(DB_FILE, users)
                     
+                    chats = load_data(CHAT_FILE)
+                    filtered_chats = [c for c in chats if c.get("sender") != target_user and c.get("target") != target_user]
+                    save_data(CHAT_FILE, filtered_chats)
+                
+                self.send_response(302)
+                self.send_header('Location', f'/admin?pass={ADMIN_SECRET}')
+                self.end_headers()
+                return
+
+            # CSAK AZ ADOTT FELHASZNÁLÓ CHATELŐZMÉNYEINEK TÖRLÉSE (A naplóból NEM törlődik!)
+            if action == "clear_chat":
+                target_user = query.get("user", [""])[0]
+                if target_user:
                     chats = load_data(CHAT_FILE)
                     filtered_chats = [c for c in chats if c.get("sender") != target_user and c.get("target") != target_user]
                     save_data(CHAT_FILE, filtered_chats)
@@ -105,7 +138,7 @@ class SimpleServer(BaseHTTPRequestHandler):
             <head>
                 <title>Lenner Műhely Admin Panel</title>
                 <style>
-                    body {{ font-family: Arial, sans-serif; background: #121212; color: #fff; padding: 20px; margin: 0; }}
+                    body {{ font-family: Arial; background: #121212; color: #fff; padding: 20px; margin: 0; }}
                     .header-container {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }}
                     h1, h2 {{ color: #FF8C00; margin: 0; }}
                     table {{ border-collapse: collapse; width: 100%; margin-bottom: 20px; background: #1E1E1E; }}
@@ -201,62 +234,55 @@ class SimpleServer(BaseHTTPRequestHandler):
                         gap: 12px;
                     }}
 
-                    /* BUBORÉKOK JOBB ALUL */
                     #bubbles-container {{
                         position: fixed;
                         bottom: 20px;
                         right: 20px;
                         display: flex;
                         flex-direction: row-reverse;
-                        gap: 12px;
+                        gap: 10px;
                         z-index: 1000;
                     }}
 
                     .user-bubble {{
-                        min-width: 160px;
-                        padding: 10px 16px;
-                        background: #E67E22;
-                        color: #FFFFFF;
-                        border: 2px solid #FF8C00;
-                        border-radius: 12px;
+                        width: 180px;
+                        height: 45px;
+                        background: #D35400;
+                        color: #fff;
+                        border-radius: 8px;
                         display: flex;
                         align-items: center;
                         justify-content: center;
                         font-weight: bold;
                         cursor: pointer;
-                        box-shadow: 0 4px 15px rgba(255, 140, 0, 0.4);
+                        box-shadow: 0 4px 10px rgba(0,0,0,0.5);
                         text-align: center;
-                        font-size: 14px;
+                        font-size: 13px;
+                        padding: 5px;
                         box-sizing: border-box;
-                        transition: transform 0.2s;
-                    }}
-                    .user-bubble:hover {{
-                        transform: scale(1.05);
                     }}
 
                     .blinking {{
-                        background: #D35400 !important;
-                        border-color: #FF4500 !important;
-                        animation: blink 0.8s infinite alternate;
+                        animation: blink 1s infinite;
                     }}
                     @keyframes blink {{
-                        0% {{ opacity: 1; box-shadow: 0 0 10px #FF8C00; }}
-                        100% {{ opacity: 0.4; box-shadow: 0 0 25px #FF4500; }}
+                        0% {{ opacity: 1; }}
+                        50% {{ opacity: 0.3; }}
+                        100% {{ opacity: 1; }}
                     }}
 
-                    /* EGYES CHAT MODAL - PONT A BUBORÉK FELETT */
                     #chat-modal {{
                         position: fixed;
                         bottom: 75px;
                         right: 20px;
-                        width: 420px;
-                        height: 450px;
+                        width: 450px;
+                        height: 480px;
                         background: #1E1E1E;
                         border: 2px solid #FF8C00;
                         border-radius: 10px;
                         display: none;
                         flex-direction: column;
-                        box-shadow: 0 5px 25px rgba(0,0,0,0.8);
+                        box-shadow: 0 5px 15px rgba(0,0,0,0.7);
                         z-index: 1001;
                     }}
                     #chat-header {{
@@ -317,8 +343,6 @@ class SimpleServer(BaseHTTPRequestHandler):
 
                     let userLastSeenCount = getStorage('userLastSeenCount');
                     let persistentBubbles = getStorage('persistentBubbles');
-                    // Helyi tárolás a törölt chat nézetekhez, hogy a napló megmaradjon, de a chat ablak üres legyen
-                    let clearedChats = getStorage('clearedChats');
 
                     function playNotificationSound() {{
                         if (!soundEnabled) return;
@@ -422,7 +446,7 @@ class SimpleServer(BaseHTTPRequestHandler):
 
                             let logSidebar = document.getElementById('log-sidebar');
                             if (logSidebar.style.display === 'flex') {{
-                                renderLoggedChats(chats);
+                                loadLoggedChats();
                             }}
                         }}).catch(e => {{}});
                     }}
@@ -443,10 +467,10 @@ class SimpleServer(BaseHTTPRequestHandler):
                         }}
 
                         if (isBlinking && (!isChatOpen || currentChatUser !== username)) {{
-                            bubble.innerText = "💬 Új üzenet: " + username;
+                            bubble.innerText = "Új üzenet: " + username;
                             bubble.classList.add('blinking');
                         }} else {{
-                            bubble.innerText = "👤 " + username;
+                            bubble.innerText = username;
                             bubble.classList.remove('blinking');
                         }}
 
@@ -461,10 +485,7 @@ class SimpleServer(BaseHTTPRequestHandler):
                         if (isChatOpen && currentChatUser === username) {{
                             modal.style.display = 'none';
                             isChatOpen = false;
-                            if (bubble) {{
-                                bubble.innerText = "👤 " + username;
-                                bubble.classList.remove('blinking');
-                            }}
+                            if (bubble) bubble.classList.remove('blinking');
                         }} else {{
                             currentChatUser = username;
                             document.getElementById('chat-title').innerText = "Chat: " + username;
@@ -472,7 +493,7 @@ class SimpleServer(BaseHTTPRequestHandler):
                             isChatOpen = true;
 
                             if (bubble) {{
-                                bubble.innerText = "👤 " + username;
+                                bubble.innerText = username;
                                 bubble.classList.remove('blinking');
                             }}
 
@@ -504,42 +525,43 @@ class SimpleServer(BaseHTTPRequestHandler):
                         }}
                     }}
 
+                    /* NAPLÓZOTT BESZÉLGETÉSEK SÁV NYITÁSA / ZÁRÁSA */
                     function toggleLoggedChats() {{
                         let sidebar = document.getElementById('log-sidebar');
                         if (sidebar.style.display === 'flex') {{
                             sidebar.style.display = 'none';
                         }} else {{
                             sidebar.style.display = 'flex';
-                            fetch('/admin_api_messages?pass={ADMIN_SECRET}')
-                            .then(res => res.json())
-                            .then(chats => {{
-                                renderLoggedChats(chats);
-                            }});
+                            loadLoggedChats();
                         }}
                     }}
 
-                    function renderLoggedChats(chats) {{
-                        let body = document.getElementById('log-body');
-                        let html = '';
-                        if (chats.length === 0) {{
-                            html = '<div style="color: #888; text-align: center; margin-top: 20px;">Nincsenek még üzenetek a naplóban.</div>';
-                        }} else {{
-                            chats.forEach(msg => {{
-                                let isMe = (msg.sender === "Lenner Műhely");
-                                let senderLabel = isMe ? "Lenner Műhely ➔ " + (msg.target || "Ügyfél") : msg.sender;
-                                let bubbleClass = isMe ? "msg-admin" : "msg-user";
-                                html += `<div style="margin-bottom: 8px;">
-                                    <small style="display:block; font-size:11px; color:#FF8C00; font-weight:bold;">${{senderLabel}}</small>
-                                    <div class="message-bubble ${{bubbleClass}}" style="max-width: 100%;">${{msg.text}}</div>
-                                </div>`;
-                            }});
-                        }}
-                        body.innerHTML = html;
-                        body.scrollTop = body.scrollHeight;
+                    function loadLoggedChats() {{
+                        fetch('/admin_api_logs?pass={ADMIN_SECRET}')
+                        .then(res => res.json())
+                        .then(logs => {{
+                            let body = document.getElementById('log-body');
+                            let html = '';
+                            if (logs.length === 0) {{
+                                html = '<div style="color: #888; text-align: center; margin-top: 20px;">Nincsenek még naplózott üzenetek.</div>';
+                            }} else {{
+                                logs.forEach(msg => {{
+                                    let isMe = (msg.sender === "Lenner Műhely");
+                                    let senderLabel = isMe ? "Lenner Műhely ➔ " + (msg.target || "Ügyfél") : msg.sender;
+                                    let bubbleClass = isMe ? "msg-admin" : "msg-user";
+                                    html += `<div style="margin-bottom: 8px;">
+                                        <small style="display:block; font-size:11px; color:#FF8C00; font-weight:bold;">${{senderLabel}}</small>
+                                        <div class="message-bubble ${{bubbleClass}}" style="max-width: 100%;">${{msg.text}}</div>
+                                    </div>`;
+                                }});
+                            }}
+                            body.innerHTML = html;
+                            body.scrollTop = body.scrollHeight;
+                        }});
                     }}
 
                     function confirmDelete(username) {{
-                        if (confirm("Biztosan szeretnéd teljesen törölni ezt a felhasználót (" + username + ") és minden üzenetét?")) {{
+                        if (confirm("Biztosan szeretnéd törölni ezt a felhasználót (" + username + ") és minden üzenetét?")) {{
                             let pB = getStorage('persistentBubbles');
                             delete pB[username];
                             setStorage('persistentBubbles', pB);
@@ -552,35 +574,22 @@ class SimpleServer(BaseHTTPRequestHandler):
                         }}
                     }}
 
-                    /* CSAT TÖRLÉSE GOMB: CSAK AZ AKTÍV ABLAKOT ÜRÍTI KI, A NAPLÓ MEGMARAD */
                     function confirmClearChat(username) {{
-                        if (confirm("Biztosan üríteni szeretnéd " + username + " aktív chatablakát? (A naplózott előzmények megmaradnak!)")) {{
-                            clearedChats[username] = true;
-                            setStorage('clearedChats', clearedChats);
-
+                        if (confirm("Biztosan törölni szeretnéd " + username + " chatelőzményét? (A naplózott előzmények megmaradnak!)")) {{
                             let pB = getStorage('persistentBubbles');
                             delete pB[username];
                             setStorage('persistentBubbles', pB);
 
-                            let bubble = document.getElementById('bubble-' + username);
-                            if (bubble) bubble.remove();
+                            let uLS = getStorage('userLastSeenCount');
+                            delete uLS[username];
+                            setStorage('userLastSeenCount', uLS);
 
-                            if (isChatOpen && currentChatUser === username) {{
-                                document.getElementById('chat-body').innerHTML = '<div style="color: #888; text-align: center; margin-top: 20px;">Ez a chatablak ki lett ürítve.</div>';
-                            }}
-                            alert("A chatablak kiürítve. A naplózott beszélgetésekben az üzenetek továbbra is elérhetőek maradnak!");
+                            window.location.href = '/admin?pass={ADMIN_SECRET}&action=clear_chat&user=' + encodeURIComponent(username);
                         }}
                     }}
 
                     function renderChatMessages(chats, username) {{
                         let body = document.getElementById('chat-body');
-                        
-                        // Ha az admin kiürítette ennek a usernek a chatjét, akkor üresen mutatjuk az ablakban
-                        if (clearedChats[username]) {{
-                            body.innerHTML = '<div style="color: #888; text-align: center; margin-top: 20px;">Ez a chatablak ki lett ürítve.</div>';
-                            return;
-                        }}
-
                         let html = '';
                         chats.forEach(msg => {{
                             if (msg.sender === username || (msg.sender === "Lenner Műhely" && msg.target === username)) {{
@@ -599,12 +608,6 @@ class SimpleServer(BaseHTTPRequestHandler):
                         let text = input.value.trim();
                         if(!text || !currentChatUser) return;
 
-                        // Ha válaszol, az aktív chatablakban újra látszódni fog (töröljük a cleared state-et)
-                        if (clearedChats[currentChatUser]) {{
-                            delete clearedChats[currentChatUser];
-                            setStorage('clearedChats', clearedChats);
-                        }}
-
                         fetch('/admin?pass={ADMIN_SECRET}&action=reply&user=' + encodeURIComponent(currentChatUser) + '&text=' + encodeURIComponent(text))
                         .then(() => {{
                             input.value = '';
@@ -617,7 +620,7 @@ class SimpleServer(BaseHTTPRequestHandler):
                                 renderChatMessages(chats, currentChatUser);
                                 let logSidebar = document.getElementById('log-sidebar');
                                 if (logSidebar.style.display === 'flex') {{
-                                    renderLoggedChats(chats);
+                                    loadLoggedChats();
                                 }}
                             }});
                         }});
@@ -738,6 +741,13 @@ class SimpleServer(BaseHTTPRequestHandler):
             data["read"] = False
             chats.append(data)
             save_data(CHAT_FILE, chats)
+
+            # Mentés az örök naplóba is
+            logs = load_data(LOG_FILE)
+            if not isinstance(logs, list):
+                logs = []
+            logs.append(data)
+            save_data(LOG_FILE, logs)
             
             self.send_response(200)
             self.end_headers()
