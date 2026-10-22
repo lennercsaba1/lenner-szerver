@@ -325,7 +325,7 @@ class SimpleServer(BaseHTTPRequestHandler):
                 </style>
                 <script>
                     let currentChatUser = "";
-                    let currentLogUser = ""; // Tároljuk, hogy melyik ügyfél naplója van megnyitva
+                    let currentLogUser = "";
                     let isChatOpen = false;
                     let soundEnabled = true;
 
@@ -527,11 +527,9 @@ class SimpleServer(BaseHTTPRequestHandler):
                         }}
                     }}
 
-                    /* NAPLÓZOTT BESZÉLGETÉS SÁV NYITÁSA ADOTT ÜGYFÉLRE SZŰRVE */
                     function toggleLoggedChats(username) {{
                         let sidebar = document.getElementById('log-sidebar');
                         
-                        // Ha ugyanazt az ügyfelet nyitjuk meg újra, vagy bezárjuk
                         if (sidebar.style.display === 'flex' && currentLogUser === username) {{
                             sidebar.style.display = 'none';
                             currentLogUser = "";
@@ -550,8 +548,11 @@ class SimpleServer(BaseHTTPRequestHandler):
                             let body = document.getElementById('log-body');
                             let html = '';
                             
-                            // Szűrés CSAK az adott ügyfél üzeneteire
-                            let userLogs = logs.filter(msg => msg.sender === username || msg.target === username);
+                            let userLogs = logs.filter(msg => {{
+                                let s = msg.sender || "";
+                                let t = msg.target || "";
+                                return s === username || t === username;
+                            }});
 
                             if (userLogs.length === 0) {{
                                 html = '<div style="color: #888; text-align: center; margin-top: 20px;">Nincsenek még naplózott üzenetek ehhez a felhasználóhoz.</div>';
@@ -770,7 +771,7 @@ class SimpleServer(BaseHTTPRequestHandler):
             user_messages = [
                 c for c in chats 
                 if c.get("sender") == username or 
-                   (c.get("sender") == "Lenner Műhely" && c.get("target") == username)
+                   (c.get("sender") == "Lenner Műhely" and c.get("target") == username)
             ]
             
             self.send_response(200)
