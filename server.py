@@ -273,7 +273,6 @@ class SimpleServer(BaseHTTPRequestHandler):
                     }}
 
                     let userLastSeenCount = getStorage('userLastSeenCount');
-                    let dismissedCountPerUser = getStorage('dismissedCountPerUser');
                     let persistentBubbles = getStorage('persistentBubbles');
 
                     function playNotificationSound() {{
@@ -351,18 +350,20 @@ class SimpleServer(BaseHTTPRequestHandler):
                             for (let u in userMessages) {{
                                 let count = userMessages[u].length;
 
-                                // Ha teljesen új felhasználó írt legelőször:
-                                if (!(u in userLastSeenCount)) {{
+                                // Ha teljesen új felhasználó vagy több üzenete érkezett, mint amennyit utoljára láttunk
+                                if (!(u in userLastSeenCount) || count > userLastSeenCount[u]) {{
                                     createOrUpdateBubble(u, true);
-                                    userLastSeenCount[u] = 0;
-                                    shouldPlaySound = true;
-                                }}
-                                // Ha már ismert felhasználónak jött új üzenete:
-                                else if (count > userLastSeenCount[u] && count !== dismissedCountPerUser[u]) {{
-                                    createOrUpdateBubble(u, true);
-                                    shouldPlaySound = true;
+                                    
+                                    // Ha a chat ablak épp NYITVA van nála, az üzeneteket látottnak tekintjük
+                                    if (isChatOpen && currentChatUser === u) {{
+                                        userLastSeenCount[u] = count;
+                                    }} else {{
+                                        shouldPlaySound = true;
+                                    }}
                                 }}
                             }}
+
+                            setStorage('userLastSeenCount', userLastSeenCount);
 
                             if (shouldPlaySound) {{
                                 playNotificationSound();
@@ -413,18 +414,6 @@ class SimpleServer(BaseHTTPRequestHandler):
                             modal.style.display = 'none';
                             isChatOpen = false;
                             if (bubble) bubble.classList.remove('blinking');
-                            
-                            fetch('/admin_api_messages?pass={ADMIN_SECRET}')
-                            .then(res => res.json())
-                            .then(chats => {{
-                                let uMsgs = chats.filter(c => c.sender === username);
-                                userLastSeenCount[username] = uMsgs.length;
-                                dismissedCountPerUser[username] = uMsgs.length;
-                                setStorage('userLastSeenCount', userLastSeenCount);
-                                setStorage('dismissedCountPerUser', dismissedCountPerUser);
-                            }});
-
-                            fetch('/admin?pass={ADMIN_SECRET}&action=ack&user=' + encodeURIComponent(username));
                         }} else {{
                             currentChatUser = username;
                             document.getElementById('chat-title').innerText = "Chat: " + username;
@@ -441,9 +430,7 @@ class SimpleServer(BaseHTTPRequestHandler):
                             .then(chats => {{
                                 let uMsgs = chats.filter(c => c.sender === username);
                                 userLastSeenCount[username] = uMsgs.length;
-                                dismissedCountPerUser[username] = uMsgs.length;
                                 setStorage('userLastSeenCount', userLastSeenCount);
-                                setStorage('dismissedCountPerUser', dismissedCountPerUser);
                                 renderChatMessages(chats, username);
                                 fetch('/admin?pass={ADMIN_SECRET}&action=ack&user=' + encodeURIComponent(username));
                             }});
@@ -462,18 +449,7 @@ class SimpleServer(BaseHTTPRequestHandler):
 
                             delete persistentBubbles[currentChatUser];
                             setStorage('persistentBubbles', persistentBubbles);
-                            
-                            fetch('/admin_api_messages?pass={ADMIN_SECRET}')
-                            .then(res => res.json())
-                            .then(chats => {{
-                                let uMsgs = chats.filter(c => c.sender === currentChatUser);
-                                userLastSeenCount[currentChatUser] = uMsgs.length;
-                                dismissedCountPerUser[currentChatUser] = uMsgs.length;
-                                setStorage('userLastSeenCount', userLastSeenCount);
-                                setStorage('dismissedCountPerUser', dismissedCountPerUser);
-                                fetch('/admin?pass={ADMIN_SECRET}&action=ack&user=' + encodeURIComponent(currentChatUser));
-                                currentChatUser = "";
-                            }});
+                            currentChatUser = "";
                         }}
                     }}
 
@@ -533,9 +509,7 @@ class SimpleServer(BaseHTTPRequestHandler):
                             .then(chats => {{
                                 let uMsgs = chats.filter(c => c.sender === currentChatUser);
                                 userLastSeenCount[currentChatUser] = uMsgs.length;
-                                dismissedCountPerUser[currentChatUser] = uMsgs.length;
                                 setStorage('userLastSeenCount', userLastSeenCount);
-                                setStorage('dismissedCountPerUser', dismissedCountPerUser);
                                 renderChatMessages(chats, currentChatUser);
                             }});
                         }});
