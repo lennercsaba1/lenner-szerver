@@ -75,7 +75,7 @@ class SimpleServer(BaseHTTPRequestHandler):
                 self.wfile.write(b"OK")
                 return
 
-            # Felhasználó ÉS a hozzá tartozó összes üzenet törlése
+            # Teljes felhasználó törlése (Fiók + Üzenetek)
             if action == "delete_user":
                 target_user = query.get("user", [""])[0]
                 if target_user:
@@ -84,19 +84,6 @@ class SimpleServer(BaseHTTPRequestHandler):
                         del users[target_user]
                         save_data(DB_FILE, users)
                     
-                    chats = load_data(CHAT_FILE)
-                    filtered_chats = [c for c in chats if c.get("sender") != target_user and c.get("target") != target_user]
-                    save_data(CHAT_FILE, filtered_chats)
-                
-                self.send_response(302)
-                self.send_header('Location', f'/admin?pass={ADMIN_SECRET}')
-                self.end_headers()
-                return
-
-            # CSAK AZ ADOTT FELHASZNÁLÓ CHATELŐZMÉNYEINEK TÖRLÉSE
-            if action == "clear_chat":
-                target_user = query.get("user", [""])[0]
-                if target_user:
                     chats = load_data(CHAT_FILE)
                     filtered_chats = [c for c in chats if c.get("sender") != target_user and c.get("target") != target_user]
                     save_data(CHAT_FILE, filtered_chats)
@@ -330,6 +317,8 @@ class SimpleServer(BaseHTTPRequestHandler):
 
                     let userLastSeenCount = getStorage('userLastSeenCount');
                     let persistentBubbles = getStorage('persistentBubbles');
+                    // Helyi tárolás a törölt chat nézetekhez, hogy a napló megmaradjon, de a chat ablak üres legyen
+                    let clearedChats = getStorage('clearedChats');
 
                     function playNotificationSound() {{
                         if (!soundEnabled) return;
@@ -550,7 +539,7 @@ class SimpleServer(BaseHTTPRequestHandler):
                     }}
 
                     function confirmDelete(username) {{
-                        if (confirm("Biztosan szeretnéd törölni ezt a felhasználót (" + username + ") és minden üzenetét?")) {{
+                        if (confirm("Biztosan szeretnéd teljesen törölni ezt a felhasználót (" + username + ") és minden üzenetét?")) {{
                             let pB = getStorage('persistentBubbles');
                             delete pB[username];
                             setStorage('persistentBubbles', pB);
@@ -563,22 +552,35 @@ class SimpleServer(BaseHTTPRequestHandler):
                         }}
                     }}
 
+                    /* CSAT TÖRLÉSE GOMB: CSAK AZ AKTÍV ABLAKOT ÜRÍTI KI, A NAPLÓ MEGMARAD */
                     function confirmClearChat(username) {{
-                        if (confirm("Biztosan törölni szeretnéd " + username + " aktív chatelőzményét?")) {{
+                        if (confirm("Biztosan üríteni szeretnéd " + username + " aktív chatablakát? (A naplózott előzmények megmaradnak!)")) {{
+                            clearedChats[username] = true;
+                            setStorage('clearedChats', clearedChats);
+
                             let pB = getStorage('persistentBubbles');
                             delete pB[username];
                             setStorage('persistentBubbles', pB);
 
-                            let uLS = getStorage('userLastSeenCount');
-                            delete uLS[username];
-                            setStorage('userLastSeenCount', uLS);
+                            let bubble = document.getElementById('bubble-' + username);
+                            if (bubble) bubble.remove();
 
-                            window.location.href = '/admin?pass={ADMIN_SECRET}&action=clear_chat&user=' + encodeURIComponent(username);
+                            if (isChatOpen && currentChatUser === username) {{
+                                document.getElementById('chat-body').innerHTML = '<div style="color: #888; text-align: center; margin-top: 20px;">Ez a chatablak ki lett ürítve.</div>';
+                            }}
+                            alert("A chatablak kiürítve. A naplózott beszélgetésekben az üzenetek továbbra is elérhetőek maradnak!");
                         }}
                     }}
 
                     function renderChatMessages(chats, username) {{
                         let body = document.getElementById('chat-body');
+                        
+                        // Ha az admin kiürítette ennek a usernek a chatjét, akkor üresen mutatjuk az ablakban
+                        if (clearedChats[username]) {{
+                            body.innerHTML = '<div style="color: #888; text-align: center; margin-top: 20px;">Ez a chatablak ki lett ürítve.</div>';
+                            return;
+                        }}
+
                         let html = '';
                         chats.forEach(msg => {{
                             if (msg.sender === username || (msg.sender === "Lenner Műhely" && msg.target === username)) {{
@@ -596,6 +598,12 @@ class SimpleServer(BaseHTTPRequestHandler):
                         let input = document.getElementById('reply-text');
                         let text = input.value.trim();
                         if(!text || !currentChatUser) return;
+
+                        // Ha válaszol, az aktív chatablakban újra látszódni fog (töröljük a cleared state-et)
+                        if (clearedChats[currentChatUser]) {{
+                            delete clearedChats[currentChatUser];
+                            setStorage('clearedChats', clearedChats);
+                        }}
 
                         fetch('/admin?pass={ADMIN_SECRET}&action=reply&user=' + encodeURIComponent(currentChatUser) + '&text=' + encodeURIComponent(text))
                         .then(() => {{
