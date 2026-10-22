@@ -225,6 +225,11 @@ class SimpleServer(BaseHTTPRequestHandler):
                         border-top-left-radius: 8px;
                         border-top-right-radius: 8px;
                     }}
+                    .log-header-buttons {{
+                        display: flex;
+                        gap: 6px;
+                        align-items: center;
+                    }}
                     #log-body {{
                         flex: 1;
                         padding: 15px;
@@ -572,6 +577,56 @@ class SimpleServer(BaseHTTPRequestHandler):
                         }});
                     }}
 
+                    /* NAPLÓ MENTÉSE .DOC FÁJLBA */
+                    function saveLogAsDoc() {{
+                        if (!currentLogUser) return;
+                        
+                        fetch('/admin_api_logs?pass={ADMIN_SECRET}')
+                        .then(res => res.json())
+                        .then(logs => {{
+                            let userLogs = logs.filter(msg => {{
+                                let s = msg.sender || "";
+                                let t = msg.target || "";
+                                return s === currentLogUser || t === currentLogUser;
+                            }});
+
+                            if (userLogs.length === 0) {{
+                                alert("Nincs mit menteni, ehhez a felhasználóhoz nincsenek üzenetek.");
+                                return;
+                            }}
+
+                            // Word által nyitható HTML formátumú .doc tartalom összeállítása
+                            let docContent = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/1999/xhtml">
+                            <head><meta charset="utf-8"><title>Napló - ${{currentLogUser}}</title></head>
+                            <body style="font-family: Arial, sans-serif; color: #000; padding: 20px;">
+                                <h2 style="color: #FF8C00;">Lenner Gumiszerviz - Naplózott Beszélgetés</h2>
+                                <p><strong>Ügyfél:</strong> ${{currentLogUser}}</p>
+                                <hr style="border: 1px solid #FF8C00;"/>
+                                <div style="margin-top: 20px;">`;
+
+                            userLogs.forEach(msg => {{
+                                let senderLabel = (msg.sender === "Lenner Műhely") ? "Lenner Műhely (Admin)" : msg.sender;
+                                docContent += `<div style="margin-bottom: 12px; padding: 8px; background: #f4f4f4; border-left: 4px solid #FF8C00;">
+                                    <small style="color: #666; font-size: 11px;">${{senderLabel}}:</small><br/>
+                                    <span style="font-size: 14px;">${{msg.text}}</span>
+                                </div>`;
+                            }});
+
+                            docContent += `</div></body></html>`;
+
+                            // Letöltési Blob létrehozása és ablak felhívása
+                            let blob = new Blob(['\\ufeff' + docContent], {{ type: 'application/msword;charset=utf-8' }});
+                            let url = URL.createObjectURL(blob);
+                            let a = document.createElement('a');
+                            a.href = url;
+                            a.download = `naplo_${{currentLogUser}}.doc`;
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            URL.revokeObjectURL(url);
+                        }});
+                    }}
+
                     function confirmDelete(username) {{
                         if (confirm("Biztosan szeretnéd törölni ezt a felhasználót (" + username + ") és minden üzenetét?")) {{
                             let pB = getStorage('persistentBubbles');
@@ -671,7 +726,10 @@ class SimpleServer(BaseHTTPRequestHandler):
                 <div id="log-sidebar">
                     <div id="log-header">
                         <span id="log-title">Naplózott beszélgetés</span>
-                        <button onclick="let sb=document.getElementById('log-sidebar'); sb.style.display='none'; currentLogUser='';" style="background: #444; color: #fff; padding: 2px 8px; margin:0;">X</button>
+                        <div class="log-header-buttons">
+                            <button onclick="saveLogAsDoc()" style="background: #FF8C00; color: #000; padding: 2px 10px; margin:0; font-weight:bold;">Mentés</button>
+                            <button onclick="let sb=document.getElementById('log-sidebar'); sb.style.display='none'; currentLogUser='';" style="background: #444; color: #fff; padding: 2px 8px; margin:0;">X</button>
+                        </div>
                     </div>
                     <div id="log-body"></div>
                 </div>
@@ -771,7 +829,7 @@ class SimpleServer(BaseHTTPRequestHandler):
             user_messages = [
                 c for c in chats 
                 if c.get("sender") == username or 
-                   (c.get("sender") == "Lenner Műhely" and c.get("target") == username)
+                   (c.get("sender") == "Lenner Műhely" && c.get("target") == username)
             ]
             
             self.send_response(200)
