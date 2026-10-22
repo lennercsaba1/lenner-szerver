@@ -88,7 +88,6 @@ class SimpleServer(BaseHTTPRequestHandler):
                 <script>
                     setInterval(function() {{
                         let activeElement = document.activeElement;
-                        // Csak akkor frissítünk háttérben, ha az admin éppen nem gépel semmit
                         if (!activeElement || activeElement.tagName !== 'INPUT') {{
                             fetch(window.location.href)
                             .then(response => response.text())
@@ -102,13 +101,10 @@ class SimpleServer(BaseHTTPRequestHandler):
                     }}, 4000);
 
                     function acknowledgeAlert() {{
-                        var audio = document.getElementById('alertSound');
-                        if(audio) {{ audio.pause(); audio.currentTime = 0; }}
-                        document.getElementById('alert-box').innerHTML = ''; // Azonnal eltünteti a sávot
-                        
                         fetch('/admin?pass=""" + ADMIN_SECRET + """&action=ack')
                         .then(() => {{
-                            // Háttérben elmentve, nem kell teljes oldalújratöltés
+                            // Azonnal újratölti az oldalt, így a hang is törlődik a memóriából, de mivel olvasott, nem visít tovább
+                            location.reload();
                         }});
                     }}
                 </script>
@@ -241,7 +237,7 @@ class SimpleServer(BaseHTTPRequestHandler):
         elif self.path == "/get_messages":
             username = data.get("username", "")
             chats = load_data(CHAT_FILE)
-            user_messages = [c for c in chats if c.get("sender") == username or c.get("target"] == username or c.get("sender") == "Lenner Műhely"]
+            user_messages = [c for c in chats if c.get("sender") == username or c.get("target") == username or c.get("sender") == "Lenner Műhely"]
             
             self.send_response(200)
             self.send_header("Content-type", "application/json; charset=utf-8")
