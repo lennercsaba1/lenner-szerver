@@ -51,7 +51,7 @@ class SimpleServer(BaseHTTPRequestHandler):
 
             action = query.get("action", [""])[0]
 
-            # Válasz küldése AJAX / GET módon
+            # Válasz küldése
             if action == "reply":
                 target_user = query.get("user", [""])[0]
                 reply_text = query.get("text", [""])[0]
@@ -91,7 +91,7 @@ class SimpleServer(BaseHTTPRequestHandler):
                     input, button {{ padding: 8px; margin: 4px 0; background: #222; color: #fff; border: 1px solid #FF8C00; border-radius: 4px; }}
                     button {{ background: #FF8C00; color: #000; font-weight: bold; cursor: pointer; }}
 
-                    /* Jobb alsó sarok értesítő buborék (~5cm x 1cm -> kb. 200px x 45px) */
+                    /* Jobb alsó sarok értesítő buborék */
                     #float-notification {{
                         position: fixed;
                         bottom: 20px;
@@ -121,10 +121,10 @@ class SimpleServer(BaseHTTPRequestHandler):
                         100% {{ opacity: 1; }}
                     }}
 
-                    /* Felugró Chat Ablak (~20cm x 20cm -> kb. 450px x 480px), pontosan a buborék felett */
+                    /* Felugró Chat Ablak közvetlenül a buborék felett */
                     #chat-modal {{
                         position: fixed;
-                        bottom: 75px; /* A buborék felett helyezkedik el */
+                        bottom: 75px;
                         right: 20px;
                         width: 450px;
                         height: 480px;
@@ -187,11 +187,10 @@ class SimpleServer(BaseHTTPRequestHandler):
                             
                             if (unread.length > 0) {{
                                 let latest = unread[unread.length - 1];
-                                if (!currentChatUser) {{
-                                    currentChatUser = latest.sender;
-                                }}
-                                // Ha még nem volt megnyitva, villog és mutatja az új üzenetet
-                                if (notif.style.display !== 'flex' && !isChatOpen) {{
+                                currentChatUser = latest.sender;
+                                
+                                // Ha le van csukva az ablak, újra elindítjuk a villogást és kiírjuk, hogy új üzenet
+                                if (!isChatOpen) {{
                                     notif.innerText = "Új üzenet: " + currentChatUser;
                                     notif.classList.add('blinking');
                                     notif.style.display = 'flex';
@@ -210,11 +209,11 @@ class SimpleServer(BaseHTTPRequestHandler):
                         let modal = document.getElementById('chat-modal');
 
                         if (isChatOpen) {{
-                            // Ha nyitva volt, kattintásra lecsukjuk a chatet, de a buborék marad
+                            // Lecsukás
                             modal.style.display = 'none';
                             isChatOpen = false;
                         }} else {{
-                            // Megnyitjuk: megszűnik a villogás, csak a név marad
+                            // Megnyitás: leáll a villogás, tisztán csak a név marad
                             notif.classList.remove('blinking');
                             notif.innerText = currentChatUser;
                             modal.style.display = 'flex';
@@ -233,7 +232,7 @@ class SimpleServer(BaseHTTPRequestHandler):
                     }}
 
                     function closeChatCompletely(event) {{
-                        event.stopPropagation(); // Ne hívja meg a buborék kattintást
+                        event.stopPropagation();
                         document.getElementById('chat-modal').style.display = 'none';
                         document.getElementById('float-notification').style.display = 'none';
                         isChatOpen = false;
