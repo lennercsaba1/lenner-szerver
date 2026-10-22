@@ -5,8 +5,7 @@ import urllib.parse
 
 DB_FILE = "adatbazis.json"
 CHAT_FILE = "chat_uzenetek.json"
-RENDELES_FILE = "rendelesek.json"
-ADMIN_SECRET = "lenneradmin123"  # Admin jelszó a műhelyi géphez
+ADMIN_SECRET = "lenneradmin123"
 
 def load_data(file_path):
     if not os.path.exists(file_path):
@@ -27,18 +26,50 @@ class SimpleServer(BaseHTTPRequestHandler):
         path = parsed_path.path
         query = urllib.parse.parse_qs(parsed_path.query)
 
-        # Műhelyi Admin Panel
         if path == "/admin":
             password = query.get("pass", [""])[0]
             if password != ADMIN_SECRET:
                 self.send_response(401)
                 self.end_headers()
-                self.wfile.write("Helytelen admin jelszó! Használd a ?pass=JELSZO formátumot.".encode('utf-8'))
+                self.wfile.write("Helytelen admin jelszó!".encode('utf-8'))
+                return
+
+            action = query.get("action", [""])[0]
+            
+            # Ha az admin rákattintott egy üzenetre (nyugtázza / olvasottnak jelöli), kikapcsoljuk a riasztást
+            if action == "ack":
+                chats = load_data(CHAT_FILE)
+                for msg in chats:
+                    msg["read"] = True
+                save_data(CHAT_FILE, chats)
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b"OK")
+                return
+
+            # Válasz küldése az admin felületről
+            if action == "reply":
+                target_user = query.get("user", [""])[0]
+                reply_text = query.get("text", [""])[0]
+                if target_user and reply_text:
+                    chats = load_data(CHAT_FILE)
+                    chats.append({
+                        "sender": "Lenner Műhely",
+                        "target": target_user,
+                        "text": reply_text,
+                        "read": True
+                    })
+                    save_data(CHAT_FILE, chats)
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b"OK")
                 return
 
             users = load_data(DB_FILE)
             chats = load_data(CHAT_FILE)
-            rendelesek = load_data(RENDELES_FILE)
+
+            # Ellenőrizzük, van-e olvasatlan ügyfélenkénti üzenet a riasztáshoz
+            has_unread = any(not c.get("read", False) and c.get("sender") != "Lenner Műhely" for c in chats)
 
             self.send_response(200)
             self.send_header("Content-type", "text/html; charset=utf-8")
@@ -48,7 +79,7 @@ class SimpleServer(BaseHTTPRequestHandler):
             <html>
             <head>
                 <title>Lenner Műhely Admin Panel</title>
-                <meta http-equiv="refresh" content="5"> <!-- 5 másodpercenként frissül, hogy látsd az új üzeneteket -->
+                <meta http-equiv="refresh" content="4">
                 <style>
                     body {{ font-family: Arial; background: #121212; color: #fff; padding: 20px; }}
                     h1, h2 {{ color: #FF8C00; }}
@@ -56,11 +87,70 @@ class SimpleServer(BaseHTTPRequestHandler):
                     th, td {{ border: 1px solid #444; padding: 10px; text-align: left; }}
                     th {{ background: #222; }}
                     .card {{ background: #1E1E1E; padding: 15px; border-radius: 8px; margin-bottom: 20px; }}
+                    input, button {{ padding: 8px; margin: 4px 0; background: #222; color: #fff; border: 1px solid #FF8C00; border-radius: 4px; }}
+                    button {{ background: #FF8C00; color: #000; font-weight: bold; cursor: pointer; }}
                 </style>
             </head>
             <body>
                 <h1>Lenner Gumiszerviz - Műhely Vezérlőpult</h1>
-                
+            """
+
+            # Ha van olvasatlan üzenet, beletesszük a folyamatos böngészős hangjelzést (Web Audio API / Beep loop)
+            if has_unread:
+                html += """
+                <audio id="alertSound" loop autoplay>
+                    <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
+                </audio>
+                <div style="background: #D35400; color: #fff; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-weight: bold; font-size: 18px; text-align: center;">
+                    ⚠️ ÚJ ÜZENET ÉRKEZETT! A riasztás szól, amíg rá nem kattintasz a nyugtázásra!
+                    <br><br>
+                    <button onclick="acknowledgeAlert()" style="font-size: 16px; padding: 10px 20px; background: #fff; color: #000;">Riasztás elnémítása / Olvasottá tétel</button>
+                </div>
+                <script>
+                    function acknowledgeAlert() {
+                        fetch('/admin?pass=""" + ADMIN_SECRET + """&action=ack')
+                        .then(() => { location.reload(); });
+                    }
+                    // Automatikus hang lejátszás biztosítása
+                    document.addEventListener('click', () => {
+                        var audio = document.getElementById('alertSound');
+                        if(audio) audio.play();
+                    }, { once: true });
+                </script>
+                """
+
+            html += f"""
+                <div class="card">
+                    <h2>Élő Chat & Válaszadás</h2>
+                    <table>
+                        <tr><th>Küldő</th><th>Célzott Ügyfél</th><th>Üzenet</th><th>Válasz küldése</th></tr>
+            """
+            if isinstance(chats, list):
+                for msg in chats:
+                    sender = msg.get('sender', 'Ismeretlen')
+                    target = msg.get('target', 'Mindenki')
+                    text = msg.get('text', '')
+                    
+                    reply_form = ""
+                    if sender != "Lenner Műhely":
+                        reply_form = f"""
+                        <form action="/admin" method="GET">
+                            <input type="hidden" name="pass" value="{ADMIN_SECRET}">
+                            <input type="hidden" name="action" value="reply">
+                            <input type="hidden" name="user" value="{sender}">
+                            <input type="text" name="text" placeholder="Írd be a választ..." required>
+                            <button type="submit">Küldés</button>
+                        </form>
+                        """
+                    else:
+                        reply_form = "<i>Admin válasz</i>"
+
+                    html += f"<tr><td><b>{sender}</b></td><td>{target}</td><td>{text}</td><td>{reply_form}</td></tr>"
+
+            html += f"""
+                    </table>
+                </div>
+
                 <div class="card">
                     <h2>Regisztrált Felhasználók ({len(users)})</h2>
                     <table>
@@ -71,18 +161,6 @@ class SimpleServer(BaseHTTPRequestHandler):
             html += """
                     </table>
                 </div>
-
-                <div class="card">
-                    <h2>Aktív Élő Chat Üzenetek</h2>
-                    <table>
-                        <tr><th>Küldő / Felhasználó</th><th>Üzenet</th></tr>
-            """
-            if isinstance(chats, list):
-                for msg in chats:
-                    html += f"<tr><td><b>{msg.get('sender', 'Ismeretlen')}</b></td><td>{msg.get('text', '')}</td></tr>"
-            html += """
-                    </table>
-                </div>
             </body>
             </html>
             """
@@ -90,7 +168,6 @@ class SimpleServer(BaseHTTPRequestHandler):
         else:
             self.send_response(404)
             self.end_headers()
-            self.wfile.write("Nem talalhato".encode('utf-8'))
 
     def do_POST(self):
         content_length = int(self.headers.get('Content-Length', 0))
@@ -101,58 +178,58 @@ class SimpleServer(BaseHTTPRequestHandler):
         except:
             self.send_response(400)
             self.end_headers()
-            self.wfile.write("Hibas JSON".encode('utf-8'))
             return
 
         if self.path == "/register":
             users = load_data(DB_FILE)
             username = data.get("username")
             password = data.get("password")
-            
-            if not username or not password:
+            if username and password and username not in users:
+                users[username] = password
+                save_data(DB_FILE, users)
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b"Sikeres regisztracio")
+            else:
                 self.send_response(400)
                 self.end_headers()
-                self.wfile.write("Hianyzo adatok".encode('utf-8'))
-                return
-                
-            if username in users:
-                self.send_response(409)
-                self.end_headers()
-                self.wfile.write("Mar letezik ilyen felhasznalo".encode('utf-8'))
-                return
-                
-            users[username] = password
-            save_data(DB_FILE, users)
-            
-            self.send_response(200)
-            self.end_headers()
-            self.wfile.write("Sikeres regisztracio".encode('utf-8'))
 
         elif self.path == "/login":
             users = load_data(DB_FILE)
             username = data.get("username")
             password = data.get("password")
-            
             if username in users and users[username] == password:
                 self.send_response(200)
                 self.end_headers()
-                self.wfile.write("Sikeres belepes".encode('utf-8'))
+                self.wfile.write(b"Sikeres belepes")
             else:
                 self.send_response(401)
                 self.end_headers()
-                self.wfile.write("Helytelen adatok".encode('utf-8'))
 
         elif self.path == "/chat":
-            # Üzenetek mentése a szerverre
             chats = load_data(CHAT_FILE)
             if not isinstance(chats, list):
                 chats = []
+            # Jelöljük, hogy olvasatlan
+            data["read"] = False
             chats.append(data)
             save_data(CHAT_FILE, chats)
             
             self.send_response(200)
             self.end_headers()
-            self.wfile.write("Uzenet elmentve".encode('utf-8'))
+            self.wfile.write(b"Uzenet elmentve")
+
+        elif self.path == "/get_messages":
+            # Az Android app le tudja kérdezni a saját üzeneteit és a műhely válaszait
+            username = data.get("username", "")
+            chats = load_data(CHAT_FILE)
+            user_messages = [c for c in chats if c.get("sender") == username or c.get("target") == username or c.get("sender") == "Lenner Műhely"]
+            
+            self.send_response(200)
+            self.send_header("Content-type", "application/json; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(json.dumps(user_messages, ensure_ascii=False).encode('utf-8'))
+
         else:
             self.send_response(404)
             self.end_headers()
