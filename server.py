@@ -26,7 +26,7 @@ class SimpleServer(BaseHTTPRequestHandler):
         path = parsed_path.path
         query = urllib.parse.parse_qs(parsed_path.query)
 
-        # 1. Háttér API végpont a chat üzenetek lekéréséhez (frissítés nélkül!)
+        # 1. Háttér API végpont az üzenetek lekéréséhez
         if path == "/admin_api_messages":
             password = query.get("pass", [""])[0]
             if password != ADMIN_SECRET:
@@ -40,7 +40,7 @@ class SimpleServer(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps(chats, ensure_ascii=False).encode('utf-8'))
             return
 
-        # 2. Admin felület főoldal és akciók
+        # 2. Admin felület főoldal
         if path == "/admin":
             password = query.get("pass", [""])[0]
             if password != ADMIN_SECRET:
@@ -51,7 +51,7 @@ class SimpleServer(BaseHTTPRequestHandler):
 
             action = query.get("action", [""])[0]
 
-            # Válasz küldése
+            # Válasz küldése AJAX / GET módon
             if action == "reply":
                 target_user = query.get("user", [""])[0]
                 reply_text = query.get("text", [""])[0]
@@ -65,19 +65,13 @@ class SimpleServer(BaseHTTPRequestHandler):
                     })
                     save_data(CHAT_FILE, chats)
                 
-                self.send_response(302)
-                self.send_header('Location', f'/admin?pass={ADMIN_SECRET}')
+                self.send_response(200)
                 self.end_headers()
+                self.wfile.write(b"OK")
                 return
 
-            # Admin megnyitásakor olvasottá tesszük a régieket
-            chats = load_data(CHAT_FILE)
-            for msg in chats:
-                if msg.get("sender") != "Lenner Műhely":
-                    msg["read"] = True
-            save_data(CHAT_FILE, chats)
-
             users = load_data(DB_FILE)
+            chats = load_data(CHAT_FILE)
 
             self.send_response(200)
             self.send_header("Content-type", "text/html; charset=utf-8")
@@ -88,7 +82,7 @@ class SimpleServer(BaseHTTPRequestHandler):
             <head>
                 <title>Lenner Műhely Admin Panel</title>
                 <style>
-                    body {{ font-family: Arial; background: #121212; color: #fff; padding: 20px; }}
+                    body {{ font-family: Arial; background: #121212; color: #fff; padding: 20px; margin: 0; }}
                     h1, h2 {{ color: #FF8C00; }}
                     table {{ border-collapse: collapse; width: 100%; margin-bottom: 20px; background: #1E1E1E; }}
                     th, td {{ border: 1px solid #444; padding: 10px; text-align: left; }}
@@ -96,97 +90,224 @@ class SimpleServer(BaseHTTPRequestHandler):
                     .card {{ background: #1E1E1E; padding: 15px; border-radius: 8px; margin-bottom: 20px; }}
                     input, button {{ padding: 8px; margin: 4px 0; background: #222; color: #fff; border: 1px solid #FF8C00; border-radius: 4px; }}
                     button {{ background: #FF8C00; color: #000; font-weight: bold; cursor: pointer; }}
+
+                    /* Jobb alsó sarok villogó értesítő ablak (~5cm x 1cm -> kb. 200px x 45px) */
+                    #float-notification {{
+                        position: fixed;
+                        bottom: 20px;
+                        right: 20px;
+                        width: 200px;
+                        height: 45px;
+                        background: #D35400;
+                        color: #fff;
+                        border-radius: 8px;
+                        display: none;
+                        align-items: center;
+                        justify-content: center;
+                        font-weight: bold;
+                        cursor: pointer;
+                        box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+                        animation: blink 1s infinite;
+                        z-index: 1000;
+                        text-align: center;
+                        font-size: 13px;
+                        padding: 5px;
+                    }}
+                    @keyframes blink {{
+                        0% {{ opacity: 1; }}
+                        50% {{ opacity: 0.3; }}
+                        100% {{ opacity: 1; }}
+                    }}
+
+                    /* Felugró Chat Ablak (~20cm x 20cm -> kb. 450px x 450px) */
+                    #chat-modal {{
+                        position: fixed;
+                        bottom: 20px;
+                        right: 20px;
+                        width: 450px;
+                        height: 480px;
+                        background: #1E1E1E;
+                        border: 2px solid #FF8C00;
+                        border-radius: 10px;
+                        display: none;
+                        flex-direction: column;
+                        box-shadow: 0 5px 15px rgba(0,0,0,0.7);
+                        z-index: 1001;
+                    }}
+                    #chat-header {{
+                        background: #222;
+                        padding: 10px 15px;
+                        color: #FF8C00;
+                        font-weight: bold;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        border-top-left-radius: 8px;
+                        border-top-right-radius: 8px;
+                    }}
+                    #chat-body {{
+                        flex: 1;
+                        padding: 15px;
+                        overflow-y: auto;
+                        display: flex;
+                        flex-direction: column;
+                        gap: 10px;
+                    }}
+                    .message-bubble {{
+                        padding: 8px 12px;
+                        border-radius: 6px;
+                        max-width: 80%;
+                        font-size: 14px;
+                    }}
+                    .msg-user {{ background: #333; align-self: flex-start; }}
+                    .msg-admin {{ background: #FF8C00; color: #000; align-self: flex-end; font-weight: bold; }}
+                    #chat-footer {{
+                        padding: 10px;
+                        background: #222;
+                        display: flex;
+                        gap: 5px;
+                    }}
+                    #chat-footer input {{
+                        flex: 1;
+                    }}
                 </style>
                 <script>
-                    // Háttérben 3 másodpercenként lekérdezzük az üzeneteket, és befrissítjük a táblázatot
-                    setInterval(function() {{
-                        let activeInput = document.activeElement;
-                        // Ha éppen beírsz valamit a válasz mezőbe, NEM frissítünk, hogy ne tűnjön el a szöveged!
-                        if (activeInput && activeInput.tagName === 'INPUT' && activeInput.type === 'text') {{
-                            return; 
-                        }}
+                    let currentChatUser = "";
+                    let lastMessageCount = 0;
 
+                    // Háttérben ellenőrizzük az üzeneteket
+                    setInterval(function() {{
                         fetch('/admin_api_messages?pass={ADMIN_SECRET}')
                         .then(res => res.json())
                         .then(chats => {{
-                            let tbody = document.getElementById('chat-tbody');
-                            let rows = '';
-                            chats.forEach(msg => {{
-                                let sender = msg.sender || 'Ismeretlen';
-                                let target = msg.target || 'Mindenki';
-                                let text = msg.text || '';
-                                let replyForm = '';
-                                
-                                if (sender !== "Lenner Műhely") {{
-                                    replyForm = `<form action="/admin" method="GET">
-                                        <input type="hidden" name="pass" value="{ADMIN_SECRET}">
-                                        <input type="hidden" name="action" value="reply">
-                                        <input type="hidden" name="user" value="${sender}">
-                                        <input type="text" name="text" placeholder="Írd be a választ..." required>
-                                        <button type="submit">Küldés</button>
-                                    </form>`;
-                                }} else {{
-                                    replyForm = "<i>Admin válasz</i>";
+                            let unread = chats.filter(c => !c.read && c.sender !== "Lenner Műhely");
+                            let notif = document.getElementById('float-notification');
+                            
+                            if (unread.length > 0) {{
+                                let latest = unread[unread.length - 1];
+                                currentChatUser = latest.sender;
+                                notif.innerHTML = "Új üzenet: " + currentChatUser;
+                                notif.style.display = 'flex';
+                            }} else {{
+                                if (document.getElementById('chat-modal').style.display !== 'flex') {{
+                                    notif.style.display = 'none';
                                 }}
-                                rows += `<tr><td><b>${sender}</b></td><td>${target}</td><td>${text}</td><td>${replyForm}</td></tr>`;
-                            }});
-                            if(tbody) tbody.innerHTML = rows;
+                            }}
+
+                            // Ha nyitva van a chat ablak, frissítjük a buborékokat
+                            if (document.getElementById('chat-modal').style.display === 'flex' && currentChatUser) {{
+                                renderChatMessages(chats, currentChatUser);
+                            }}
                         }}).catch(e => {{}});
                     }}, 3000);
+
+                    function openChat(username) {{
+                        if(!username) return;
+                        currentChatUser = username;
+                        document.getElementById('chat-title').innerText = "Chat: " + username;
+                        document.getElementById('float-notification').style.display = 'none';
+                        document.getElementById('chat-modal').style.display = 'flex';
+                        
+                        // Üzenetek olvasottá tétele a szerveren
+                        fetch('/admin_api_messages?pass={ADMIN_SECRET}')
+                        .then(res => res.json())
+                        .then(chats => {{
+                            renderChatMessages(chats, username);
+                            // Megjelöljük olvasottként
+                            fetch('/admin?pass={ADMIN_SECRET}&action=ack&user=' + encodeURIComponent(username));
+                        }});
+                    }}
+
+                    function closeChat() {{
+                        document.getElementById('chat-modal').style.display = 'none';
+                    }}
+
+                    function renderChatMessages(chats, username) {{
+                        let body = document.getElementById('chat-body');
+                        let html = '';
+                        chats.forEach(msg => {{
+                            if (msg.sender === username || (msg.sender === "Lenner Műhely" && msg.target === username)) {{
+                                let isMe = (msg.sender === "Lenner Műhely");
+                                let bubbleClass = isMe ? "msg-admin" : "msg-user";
+                                let senderName = isMe ? "Én (Műhely)" : msg.sender;
+                                html += `<div class="message-bubble ${{bubbleClass}}"><small style="display:block; font-size:10px; opacity:0.7;">${{senderName}}</small>${{msg.text}}</div>`;
+                            }}
+                        }});
+                        body.innerHTML = html;
+                        body.scrollTop = body.scrollHeight;
+                    }}
+
+                    function sendAdminReply() {{
+                        let input = document.getElementById('reply-text');
+                        let text = input.value.trim();
+                        if(!text || !currentChatUser) return;
+
+                        fetch('/admin?pass={ADMIN_SECRET}&action=reply&user=' + encodeURIComponent(currentChatUser) + '&text=' + encodeURIComponent(text))
+                        .then(() => {{
+                            input.value = '';
+                            // Azonnal frissítjük a nézetet
+                            fetch('/admin_api_messages?pass={ADMIN_SECRET}')
+                            .then(res => res.json())
+                            .then(chats => renderChatMessages(chats, currentChatUser));
+                        }});
+                    }}
                 </script>
             </head>
             <body>
                 <h1>Lenner Gumiszerviz - Műhely Vezérlőpult</h1>
-
+                
                 <div class="card">
-                    <h2>Élő Chat & Válaszadás</h2>
-                    <table>
-                        <thead>
-                            <tr><th>Küldő</th><th>Célzott Ügyfél</th><th>Üzenet</th><th>Válasz küldése</th></tr>
-                        </thead>
-                        <tbody id="chat-tbody">
-            """
-            if isinstance(chats, list):
-                for msg in chats:
-                    sender = msg.get('sender', 'Ismeretlen')
-                    target = msg.get('target', 'Mindenki')
-                    text = msg.get('text', '')
-                    
-                    reply_form = ""
-                    if sender != "Lenner Műhely":
-                        reply_form = f"""
-                        <form action="/admin" method="GET">
-                            <input type="hidden" name="pass" value="{ADMIN_SECRET}">
-                            <input type="hidden" name="action" value="reply">
-                            <input type="hidden" name="user" value="{sender}">
-                            <input type="text" name="text" placeholder="Írd be a választ..." required>
-                            <button type="submit">Küldés</button>
-                        </form>
-                        """
-                    else:
-                        reply_form = "<i>Admin válasz</i>"
-
-                    html += f"<tr><td><b>{sender}</b></td><td>{target}</td><td>{text}</td><td>{reply_form}</td></tr>"
-
-            html += f"""
-                        </tbody>
-                    </table>
+                    <h2>Műhely Információk</h2>
+                    <p>A rendszer készen áll. Ha egy ügyfél üzenetet küld az Android applikációból, a jobb alsó sarokban megjelenik egy villogó értesítő ablak.</p>
                 </div>
 
                 <div class="card">
                     <h2>Regisztrált Felhasználók ({len(users)})</h2>
                     <table>
-                        <tr><th>Felhasználónév</th><th>Jelszó</th></tr>
+                        <tr><th>Felhasználónév</th><th>Jelszó</th><th>Akció</th></tr>
             """
             for user, pwd in users.items():
-                html += f"<tr><td>{user}</td><td>{pwd}</td></tr>"
-            html += """
+                html += f"<tr><td>{user}</td><td>{pwd}</td><td><button onclick=\"openChat('{user}')\">Üzenet küldése</button></td></tr>"
+            html += f"""
                     </table>
                 </div>
+
+                <!-- Jobb alsó sarok villogó értesítő -->
+                <div id="float-notification" onclick="openChat(currentChatUser)">
+                    Új üzenet érkezett!
+                </div>
+
+                <!-- Felugró Chat Párbeszéd Panel (~20x20 cm) -->
+                <div id="chat-modal">
+                    <div id="chat-header">
+                        <span id="chat-title">Chat</span>
+                        <button onclick="closeChat()" style="background: #444; color: #fff; padding: 2px 8px; margin:0;">X</button>
+                    </div>
+                    <div id="chat-body">
+                        <!-- Ide jönnek a buborékok -->
+                    </div>
+                    <div id="chat-footer">
+                        <input type="text" id="reply-text" placeholder="Írd be a választ..." onkeydown="if(event.key==='Enter') sendAdminReply();">
+                        <button onclick="sendAdminReply()">Küldés</button>
+                    </div>
+                </div>
+
             </body>
             </html>
             """
             self.wfile.write(html.encode('utf-8'))
+
+        # Segéd funkció a chat olvasottá tételhez háttérből
+        elif path == "/admin" and query.get("action") == ["ack"]:
+            target_user = query.get("user", [""])[0]
+            chats = load_data(CHAT_FILE)
+            for msg in chats:
+                if msg.get("sender") == target_user:
+                    msg["read"] = True
+            save_data(CHAT_FILE, chats)
+            self.send_response(200)
+            self.end_headers()
+            return
         else:
             self.send_response(404)
             self.end_headers()
@@ -243,7 +364,7 @@ class SimpleServer(BaseHTTPRequestHandler):
         elif self.path == "/get_messages":
             username = data.get("username", "")
             chats = load_data(CHAT_FILE)
-            user_messages = [c for c in chats if c.get("sender") == username or c.get("target"] == username or c.get("sender"] == "Lenner Műhely"]
+            user_messages = [c for c in chats if c.get("sender") == username or c.get("target") == username or c.get("sender") == "Lenner Műhely"]
             
             self.send_response(200)
             self.send_header("Content-type", "application/json; charset=utf-8")
