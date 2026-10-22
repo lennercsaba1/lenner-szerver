@@ -105,7 +105,6 @@ class SimpleServer(BaseHTTPRequestHandler):
                     input, button {{ padding: 8px; margin: 4px 0; background: #222; color: #fff; border: 1px solid #FF8C00; border-radius: 4px; }}
                     button {{ background: #FF8C00; color: #000; font-weight: bold; cursor: pointer; }}
                     
-                    /* Törlés X gomb stílusa */
                     .btn-delete {{
                         background: #C0392B;
                         color: #fff;
@@ -119,27 +118,35 @@ class SimpleServer(BaseHTTPRequestHandler):
                         background: #E74C3C;
                     }}
 
-                    /* Jobb alsó sarok értesítő buborék */
-                    #float-notification {{
+                    /* Jobb alsó sarok rugalmas doboz a több buborék egymás melletti elhelyezéséhez */
+                    #bubbles-container {{
                         position: fixed;
                         bottom: 20px;
                         right: 20px;
-                        width: 200px;
+                        display: flex;
+                        flex-direction: row-reverse; /* Jobbról balra növekszik */
+                        gap: 10px;
+                        z-index: 1000;
+                    }}
+
+                    .user-bubble {{
+                        width: 180px;
                         height: 45px;
                         background: #D35400;
                         color: #fff;
                         border-radius: 8px;
-                        display: none;
+                        display: flex;
                         align-items: center;
                         justify-content: center;
                         font-weight: bold;
                         cursor: pointer;
                         box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-                        z-index: 1000;
                         text-align: center;
-                        font-size: 14px;
+                        font-size: 13px;
                         padding: 5px;
+                        box-sizing: border-box;
                     }}
+
                     .blinking {{
                         animation: blink 1s infinite;
                     }}
@@ -149,7 +156,7 @@ class SimpleServer(BaseHTTPRequestHandler):
                         100% {{ opacity: 1; }}
                     }}
 
-                    /* Felugró Chat Ablak közvetlenül a buborék felett */
+                    /* Felugró Chat Ablak */
                     #chat-modal {{
                         position: fixed;
                         bottom: 75px;
@@ -206,6 +213,7 @@ class SimpleServer(BaseHTTPRequestHandler):
                     let isChatOpen = false;
                     let userLastSeenCount = {{}};
                     let dismissedCountPerUser = {{}};
+                    let activeUserBubbles = {{}}; // Melyik usereknek van kint buborékjuk
 
                     // Háttérben ellenőrizzük az üzeneteket
                     setInterval(function() {{
@@ -220,29 +228,18 @@ class SimpleServer(BaseHTTPRequestHandler):
                                 }}
                             }});
 
-                            let alertUser = "";
+                            // Végigmegyünk az ügyfeleken és felépítjük a buborékokat
                             for (let u in userMessages) {{
                                 let count = userMessages[u].length;
-                                if (!(u in userLastSeenCount)) {{
-                                    userLastSeenCount[u] = 0;
-                                }}
+                                if (!(u in userLastSeenCount)) userLastSeenCount[u] = 0;
+
+                                // Ha új üzenet érkezett
                                 if (count > userLastSeenCount[u] && count !== dismissedCountPerUser[u]) {{
-                                    alertUser = u;
-                                    break;
+                                    createOrUpdateBubble(u, true);
                                 }}
                             }}
 
-                            let notif = document.getElementById('float-notification');
-
-                            if (alertUser) {{
-                                if (!isChatOpen || currentChatUser !== alertUser) {{
-                                    currentChatUser = alertUser;
-                                    notif.innerText = "Új üzenet: " + currentChatUser;
-                                    notif.classList.add('blinking');
-                                    notif.style.display = 'flex';
-                                }}
-                            }}
-
+                            // Ha nyitva van a chat ablak, frissítjük a szöveget
                             if (isChatOpen && currentChatUser) {{
                                 renderChatMessages(chats, currentChatUser);
                                 if (userMessages[currentChatUser]) {{
@@ -252,69 +249,101 @@ class SimpleServer(BaseHTTPRequestHandler):
                         }}).catch(e => {{}});
                     }}, 3000);
 
-                    function confirmDelete(username) {{
-                        if (confirm("Biztosan szeretnéd törölni ezt a felhasználót (" + username + ")?")) {{
-                            window.location.href = '/admin?pass={ADMIN_SECRET}&action=delete_user&user=' + encodeURIComponent(username);
+                    function createOrUpdateBubble(username, isBlinking) {{
+                        let container = document.getElementById('bubbles-container');
+                        let bubbleId = 'bubble-' + username;
+                        let bubble = document.getElementById(bubbleId);
+
+                        if (!bubble) {{
+                            bubble = document.createElement('div');
+                            bubble.id = bubbleId;
+                            bubble.className = 'user-bubble';
+                            bubble.onclick = function() {{ toggleUserChat(username); }};
+                            container.appendChild(bubble);
                         }}
+
+                        if (isBlinking && (!isChatOpen || currentChatUser !== username)) {{
+                            bubble.innerText = "Új üzenet: " + username;
+                            bubble.classList.add('blinking');
+                        }} else {{
+                            bubble.innerText = username;
+                            bubble.classList.remove('blinking');
+                        }}
+
+                        activeUserBubbles[username] = true;
                     }}
 
-                    function handleNotificationClick() {{
-                        let notif = document.getElementById('float-notification');
+                    function toggleUserChat(username) {{
                         let modal = document.getElementById('chat-modal');
+                        let bubble = document.getElementById('bubble-' + username);
 
-                        if (isChatOpen) {{
+                        if (isChatOpen && currentChatUser === username) {{
+                            // Lecsukás
                             modal.style.display = 'none';
                             isChatOpen = false;
+                            if (bubble) bubble.classList.remove('blinking');
                             
                             fetch('/admin_api_messages?pass={ADMIN_SECRET}')
                             .then(res => res.json())
                             .then(chats => {{
-                                let userMsgs = chats.filter(c => c.sender === currentChatUser);
-                                userLastSeenCount[currentChatUser] = userMsgs.length;
-                                dismissedCountPerUser[currentChatUser] = userMsgs.length;
+                                let uMsgs = chats.filter(c => c.sender === username);
+                                userLastSeenCount[username] = uMsgs.length;
+                                dismissedCountPerUser[username] = uMsgs.length;
                             }});
 
-                            if (currentChatUser) {{
-                                fetch('/admin?pass={ADMIN_SECRET}&action=ack&user=' + encodeURIComponent(currentChatUser));
-                            }}
+                            fetch('/admin?pass={ADMIN_SECRET}&action=ack&user=' + encodeURIComponent(username));
                         }} else {{
-                            notif.classList.remove('blinking');
-                            notif.innerText = currentChatUser;
+                            // Megnyitás / Váltás ügyfélre
+                            currentChatUser = username;
+                            document.getElementById('chat-title').innerText = "Chat: " + username;
                             modal.style.display = 'flex';
                             isChatOpen = true;
 
-                            if(currentChatUser) {{
-                                document.getElementById('chat-title').innerText = "Chat: " + currentChatUser;
-                                fetch('/admin_api_messages?pass={ADMIN_SECRET}')
-                                .then(res => res.json())
-                                .then(chats => {{
-                                    let userMsgs = chats.filter(c => c.sender === currentChatUser);
-                                    userLastSeenCount[currentChatUser] = userMsgs.length;
-                                    dismissedCountPerUser[currentChatUser] = userMsgs.length;
-                                    renderChatMessages(chats, currentChatUser);
-                                    fetch('/admin?pass={ADMIN_SECRET}&action=ack&user=' + encodeURIComponent(currentChatUser));
-                                }});
+                            if (bubble) {{
+                                bubble.innerText = username;
+                                bubble.classList.remove('blinking');
                             }}
+
+                            fetch('/admin_api_messages?pass={ADMIN_SECRET}')
+                            .then(res => res.json())
+                            .then(chats => {{
+                                let uMsgs = chats.filter(c => c.sender === username);
+                                userLastSeenCount[username] = uMsgs.length;
+                                dismissedCountPerUser[username] = uMsgs.length;
+                                renderChatMessages(chats, username);
+                                fetch('/admin?pass={ADMIN_SECRET}&action=ack&user=' + encodeURIComponent(username));
+                            }});
                         }}
                     }}
 
                     function closeChatCompletely(event) {{
                         event.stopPropagation();
-                        document.getElementById('chat-modal').style.display = 'none';
-                        document.getElementById('float-notification').style.display = 'none';
+                        let modal = document.getElementById('chat-modal');
+                        modal.style.display = 'none';
                         isChatOpen = false;
 
-                        fetch('/admin_api_messages?pass={ADMIN_SECRET}')
-                        .then(res => res.json())
-                        .then(chats => {{
-                            if (currentChatUser) {{
-                                let userMsgs = chats.filter(c => c.sender === currentChatUser);
-                                userLastSeenCount[currentChatUser] = userMsgs.length;
-                                dismissedCountPerUser[currentChatUser] = userMsgs.length;
+                        if (currentChatUser) {{
+                            let bubble = document.getElementById('bubble-' + currentChatUser);
+                            if (bubble) bubble.remove(); // Eltüntetjük a buborékját
+                            
+                            delete activeUserBubbles[currentChatUser];
+
+                            fetch('/admin_api_messages?pass={ADMIN_SECRET}')
+                            .then(res => res.json())
+                            .then(chats => {{
+                                let uMsgs = chats.filter(c => c.sender === currentChatUser);
+                                userLastSeenCount[currentChatUser] = uMsgs.length;
+                                dismissedCountPerUser[currentChatUser] = uMsgs.length;
                                 fetch('/admin?pass={ADMIN_SECRET}&action=ack&user=' + encodeURIComponent(currentChatUser));
-                            }}
-                            currentChatUser = "";
-                        }});
+                                currentChatUser = "";
+                            }});
+                        }}
+                    }}
+
+                    function confirmDelete(username) {{
+                        if (confirm("Biztosan szeretnéd törölni ezt a felhasználót (" + username + ")?")) {{
+                            window.location.href = '/admin?pass={ADMIN_SECRET}&action=delete_user&user=' + encodeURIComponent(username);
+                        }}
                     }}
 
                     function renderChatMessages(chats, username) {{
@@ -343,9 +372,9 @@ class SimpleServer(BaseHTTPRequestHandler):
                             fetch('/admin_api_messages?pass={ADMIN_SECRET}')
                             .then(res => res.json())
                             .then(chats => {{
-                                let userMsgs = chats.filter(c => c.sender === currentChatUser);
-                                userLastSeenCount[currentChatUser] = userMsgs.length;
-                                dismissedCountPerUser[currentChatUser] = userMsgs.length;
+                                let uMsgs = chats.filter(c => c.sender === currentChatUser);
+                                userLastSeenCount[currentChatUser] = uMsgs.length;
+                                dismissedCountPerUser[currentChatUser] = uMsgs.length;
                                 renderChatMessages(chats, currentChatUser);
                             }});
                         }});
@@ -364,19 +393,17 @@ class SimpleServer(BaseHTTPRequestHandler):
                 html += f"""<tr>
                     <td>{user}</td>
                     <td>{pwd}</td>
-                    <td><button onclick="currentChatUser='{user}'; document.getElementById('float-notification').innerText='{user}'; document.getElementById('float-notification').classList.remove('blinking'); document.getElementById('float-notification').style.display='flex'; document.getElementById('chat-modal').style.display='flex'; isChatOpen=true; document.getElementById('chat-title').innerText='Chat: {user}'; fetch('/admin_api_messages?pass={ADMIN_SECRET}').then(r=>r.json()).then(c=>{{ let uMsgs=c.filter(x=>x.sender==='{user}'); userLastSeenCount['{user}']=uMsgs.length; dismissedCountPerUser['{user}']=uMsgs.length; renderChatMessages(c,'{user}'); }}); fetch('/admin?pass={ADMIN_SECRET}&action=ack&user={user}');">Chat nyitása</button></td>
+                    <td><button onclick="createOrUpdateBubble('{user}', false); toggleUserChat('{user}');">Chat nyitása</button></td>
                     <td style="text-align: right;"><button class="btn-delete" onclick="confirmDelete('{user}')">X Törlés</button></td>
                 </tr>"""
             html += f"""
                     </table>
                 </div>
 
-                <!-- Jobb alsó sarok értesítő buborék -->
-                <div id="float-notification" onclick="handleNotificationClick()">
-                    Új üzenet
-                </div>
+                <!-- Több buborék tárolója a jobb alsó sarokban -->
+                <div id="bubbles-container"></div>
 
-                <!-- Felugró Chat Párbeszéd Panel közvetlenül a buborék felett -->
+                <!-- Felugró Chat Párbeszéd Panel -->
                 <div id="chat-modal">
                     <div id="chat-header">
                         <span id="chat-title">Chat</span>
