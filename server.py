@@ -176,6 +176,7 @@ class SimpleServer(BaseHTTPRequestHandler):
                 <script>
                     let currentChatUser = "";
                     let isChatOpen = false;
+                    let lastKnownMessageCount = 0;
 
                     // Háttérben ellenőrizzük az üzeneteket
                     setInterval(function() {{
@@ -185,15 +186,18 @@ class SimpleServer(BaseHTTPRequestHandler):
                             let unread = chats.filter(c => !c.read && c.sender !== "Lenner Műhely");
                             let notif = document.getElementById('float-notification');
                             
+                            // Ha teljesen új üzenet érkezett (több üzenet van, mint előtte, vagy van olvasatlan)
                             if (unread.length > 0) {{
                                 let latest = unread[unread.length - 1];
-                                currentChatUser = latest.sender;
                                 
-                                // Ha le van csukva az ablak, újra elindítjuk a villogást és kiírjuk, hogy új üzenet
-                                if (!isChatOpen) {{
-                                    notif.innerText = "Új üzenet: " + currentChatUser;
-                                    notif.classList.add('blinking');
-                                    notif.style.display = 'flex';
+                                // Ha új felhasználó írt, vagy új üzenet jött be, miközben le volt csukva
+                                if (latest.sender !== currentChatUser || !isChatOpen) {{
+                                    currentChatUser = latest.sender;
+                                    if (!isChatOpen) {{
+                                        notif.innerText = "Új üzenet: " + currentChatUser;
+                                        notif.classList.add('blinking');
+                                        notif.style.display = 'flex';
+                                    }}
                                 }}
                             }}
 
@@ -209,9 +213,14 @@ class SimpleServer(BaseHTTPRequestHandler):
                         let modal = document.getElementById('chat-modal');
 
                         if (isChatOpen) {{
-                            // Lecsukás
+                            // Lecsukás: elrejtjük az ablakot, de a buborék ott marad névvel (nem villog)
                             modal.style.display = 'none';
                             isChatOpen = false;
+                            
+                            // Olvasottá tesszük a szerveren, hogy ne villogjon újra, amíg nem jön új üzenet
+                            if (currentChatUser) {{
+                                fetch('/admin?pass={ADMIN_SECRET}&action=ack&user=' + encodeURIComponent(currentChatUser));
+                            }}
                         }} else {{
                             // Megnyitás: leáll a villogás, tisztán csak a név marad
                             notif.classList.remove('blinking');
@@ -236,6 +245,9 @@ class SimpleServer(BaseHTTPRequestHandler):
                         document.getElementById('chat-modal').style.display = 'none';
                         document.getElementById('float-notification').style.display = 'none';
                         isChatOpen = false;
+                        if (currentChatUser) {{
+                            fetch('/admin?pass={ADMIN_SECRET}&action=ack&user=' + encodeURIComponent(currentChatUser));
+                        }}
                         currentChatUser = "";
                     }}
 
@@ -283,7 +295,7 @@ class SimpleServer(BaseHTTPRequestHandler):
                         <tr><th>Felhasználónév</th><th>Jelszó</th><th>Akció</th></tr>
             """
             for user, pwd in users.items():
-                html += f"<tr><td>{user}</td><td>{pwd}</td><td><button onclick=\"currentChatUser='{user}'; document.getElementById('float-notification').innerText='{user}'; document.getElementById('float-notification').classList.remove('blinking'); document.getElementById('float-notification').style.display='flex'; document.getElementById('chat-modal').style.display='flex'; isChatOpen=true; document.getElementById('chat-title').innerText='Chat: {user}'; fetch('/admin_api_messages?pass={ADMIN_SECRET}').then(r=>r.json()).then(c=>renderChatMessages(c,'{user}'));\">Üzenet küldése</button></td></tr>"
+                html += f"<tr><td>{user}</td><td>{pwd}</td><td><button onclick=\"currentChatUser='{user}'; document.getElementById('float-notification').innerText='{user}'; document.getElementById('float-notification').classList.remove('blinking'); document.getElementById('float-notification').style.display='flex'; document.getElementById('chat-modal').style.display='flex'; isChatOpen=true; document.getElementById('chat-title').innerText='Chat: {user}'; fetch('/admin_api_messages?pass={ADMIN_SECRET}').then(r=>r.json()).then(c=>renderChatMessages(c,'{user}')); fetch('/admin?pass={ADMIN_SECRET}&action=ack&user={user}');\">Üzenet küldése</button></td></tr>"
             html += f"""
                     </table>
                 </div>
@@ -380,7 +392,7 @@ class SimpleServer(BaseHTTPRequestHandler):
         elif self.path == "/get_messages":
             username = data.get("username", "")
             chats = load_data(CHAT_FILE)
-            user_messages = [c for c in chats if c.get("sender") == username or c.get("target") == username or c.get("sender") == "Lenner Műhely"]
+            user_messages = [c for c in chats if c.get("sender") == username or c.get("target") == username or c.get("sender"] == "Lenner Műhely"]
             
             self.send_response(200)
             self.send_header("Content-type", "application/json; charset=utf-8")
