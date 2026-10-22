@@ -118,13 +118,12 @@ class SimpleServer(BaseHTTPRequestHandler):
                         background: #E74C3C;
                     }}
 
-                    /* Jobb alsó sarok rugalmas doboz a több buborék egymás melletti elhelyezéséhez */
                     #bubbles-container {{
                         position: fixed;
                         bottom: 20px;
                         right: 20px;
                         display: flex;
-                        flex-direction: row-reverse; /* Jobbról balra növekszik */
+                        flex-direction: row-reverse;
                         gap: 10px;
                         z-index: 1000;
                     }}
@@ -156,7 +155,6 @@ class SimpleServer(BaseHTTPRequestHandler):
                         100% {{ opacity: 1; }}
                     }}
 
-                    /* Felugró Chat Ablak */
                     #chat-modal {{
                         position: fixed;
                         bottom: 75px;
@@ -213,9 +211,8 @@ class SimpleServer(BaseHTTPRequestHandler):
                     let isChatOpen = false;
                     let userLastSeenCount = {{}};
                     let dismissedCountPerUser = {{}};
-                    let activeUserBubbles = {{}}; // Melyik usereknek van kint buborékjuk
+                    let activeUserBubbles = {{}};
 
-                    // Háttérben ellenőrizzük az üzeneteket
                     setInterval(function() {{
                         fetch('/admin_api_messages?pass={ADMIN_SECRET}')
                         .then(res => res.json())
@@ -228,18 +225,15 @@ class SimpleServer(BaseHTTPRequestHandler):
                                 }}
                             }});
 
-                            // Végigmegyünk az ügyfeleken és felépítjük a buborékokat
                             for (let u in userMessages) {{
                                 let count = userMessages[u].length;
                                 if (!(u in userLastSeenCount)) userLastSeenCount[u] = 0;
 
-                                // Ha új üzenet érkezett
                                 if (count > userLastSeenCount[u] && count !== dismissedCountPerUser[u]) {{
                                     createOrUpdateBubble(u, true);
                                 }}
                             }}
 
-                            // Ha nyitva van a chat ablak, frissítjük a szöveget
                             if (isChatOpen && currentChatUser) {{
                                 renderChatMessages(chats, currentChatUser);
                                 if (userMessages[currentChatUser]) {{
@@ -278,7 +272,6 @@ class SimpleServer(BaseHTTPRequestHandler):
                         let bubble = document.getElementById('bubble-' + username);
 
                         if (isChatOpen && currentChatUser === username) {{
-                            // Lecsukás
                             modal.style.display = 'none';
                             isChatOpen = false;
                             if (bubble) bubble.classList.remove('blinking');
@@ -293,7 +286,6 @@ class SimpleServer(BaseHTTPRequestHandler):
 
                             fetch('/admin?pass={ADMIN_SECRET}&action=ack&user=' + encodeURIComponent(username));
                         }} else {{
-                            // Megnyitás / Váltás ügyfélre
                             currentChatUser = username;
                             document.getElementById('chat-title').innerText = "Chat: " + username;
                             modal.style.display = 'flex';
@@ -324,7 +316,7 @@ class SimpleServer(BaseHTTPRequestHandler):
 
                         if (currentChatUser) {{
                             let bubble = document.getElementById('bubble-' + currentChatUser);
-                            if (bubble) bubble.remove(); // Eltüntetjük a buborékját
+                            if (bubble) bubble.remove();
                             
                             delete activeUserBubbles[currentChatUser];
 
@@ -400,18 +392,14 @@ class SimpleServer(BaseHTTPRequestHandler):
                     </table>
                 </div>
 
-                <!-- Több buborék tárolója a jobb alsó sarokban -->
                 <div id="bubbles-container"></div>
 
-                <!-- Felugró Chat Párbeszéd Panel -->
                 <div id="chat-modal">
                     <div id="chat-header">
                         <span id="chat-title">Chat</span>
                         <button onclick="closeChatCompletely(event)" style="background: #444; color: #fff; padding: 2px 8px; margin:0;">X</button>
                     </div>
-                    <div id="chat-body">
-                        <!-- Ide jönnek a buborékok -->
-                    </div>
+                    <div id="chat-body"></div>
                     <div id="chat-footer">
                         <input type="text" id="reply-text" placeholder="Írd be a választ..." onkeydown="if(event.key==='Enter') sendAdminReply();">
                         <button onclick="sendAdminReply()">Küldés</button>
@@ -489,7 +477,13 @@ class SimpleServer(BaseHTTPRequestHandler):
         elif self.path == "/get_messages":
             username = data.get("username", "")
             chats = load_data(CHAT_FILE)
-            user_messages = [c for c in chats if c.get("sender") == username or c.get("target") == username or c.get("sender") == "Lenner Műhely"]
+            
+            # --- ITT VOLT A HIBA: Csak azokat az admin üzeneteket adjuk vissza, amiknek a target-je pontosan ez a felhasználó! ---
+            user_messages = [
+                c for c in chats 
+                if c.get("sender") == username or 
+                   (c.get("sender") == "Lenner Műhely" and c.get("target") == username)
+            ]
             
             self.send_response(200)
             self.send_header("Content-type", "application/json; charset=utf-8")
