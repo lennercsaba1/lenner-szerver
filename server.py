@@ -36,6 +36,7 @@ class SimpleServer(BaseHTTPRequestHandler):
 
             action = query.get("action", [""])[0]
             
+            # Ha az admin rákattintott egy üzenetre (nyugtázza / olvasottnak jelöli), kikapcsoljuk a riasztást
             if action == "ack":
                 chats = load_data(CHAT_FILE)
                 for msg in chats:
@@ -46,6 +47,7 @@ class SimpleServer(BaseHTTPRequestHandler):
                 self.wfile.write(b"OK")
                 return
 
+            # Válasz küldése az admin felületről
             if action == "reply":
                 target_user = query.get("user", [""])[0]
                 reply_text = query.get("text", [""])[0]
@@ -65,6 +67,8 @@ class SimpleServer(BaseHTTPRequestHandler):
 
             users = load_data(DB_FILE)
             chats = load_data(CHAT_FILE)
+
+            # Ellenőrizzük, van-e olvasatlan ügyfélenkénti üzenet a riasztáshoz
             has_unread = any(not c.get("read", False) and c.get("sender") != "Lenner Műhely" for c in chats)
 
             self.send_response(200)
@@ -75,6 +79,7 @@ class SimpleServer(BaseHTTPRequestHandler):
             <html>
             <head>
                 <title>Lenner Műhely Admin Panel</title>
+                <meta http-equiv="refresh" content="4">
                 <style>
                     body {{ font-family: Arial; background: #121212; color: #fff; padding: 20px; }}
                     h1, h2 {{ color: #FF8C00; }}
@@ -85,36 +90,12 @@ class SimpleServer(BaseHTTPRequestHandler):
                     input, button {{ padding: 8px; margin: 4px 0; background: #222; color: #fff; border: 1px solid #FF8C00; border-radius: 4px; }}
                     button {{ background: #FF8C00; color: #000; font-weight: bold; cursor: pointer; }}
                 </style>
-                <script>
-                    setInterval(function() {{
-                        let activeElement = document.activeElement;
-                        if (!activeElement || activeElement.tagName !== 'INPUT') {{
-                            fetch(window.location.href)
-                            .then(response => response.text())
-                            .then(html => {{
-                                let parser = new DOMParser();
-                                let doc = parser.parseFromString(html, 'text/html');
-                                document.getElementById('chat-section').innerHTML = doc.getElementById('chat-section').innerHTML;
-                                document.getElementById('alert-box').innerHTML = doc.getElementById('alert-box').innerHTML;
-                            }});
-                        }}
-                    }}, 4000);
-
-                    function acknowledgeAlert() {{
-                        fetch('/admin?pass=""" + ADMIN_SECRET + """&action=ack')
-                        .then(() => {{
-                            // Azonnal újratölti az oldalt, így a hang is törlődik a memóriából, de mivel olvasott, nem visít tovább
-                            location.reload();
-                        }});
-                    }}
-                </script>
             </head>
             <body>
                 <h1>Lenner Gumiszerviz - Műhely Vezérlőpult</h1>
-                
-                <div id="alert-box">
             """
 
+            # Ha van olvasatlan üzenet, beletesszük a folyamatos böngészős hangjelzést (Web Audio API / Beep loop)
             if has_unread:
                 html += """
                 <audio id="alertSound" loop autoplay>
@@ -126,6 +107,11 @@ class SimpleServer(BaseHTTPRequestHandler):
                     <button onclick="acknowledgeAlert()" style="font-size: 16px; padding: 10px 20px; background: #fff; color: #000;">Riasztás elnémítása / Olvasottá tétel</button>
                 </div>
                 <script>
+                    function acknowledgeAlert() {
+                        fetch('/admin?pass=""" + ADMIN_SECRET + """&action=ack')
+                        .then(() => { location.reload(); });
+                    }
+                    // Automatikus hang lejátszás biztosítása
                     document.addEventListener('click', () => {
                         var audio = document.getElementById('alertSound');
                         if(audio) audio.play();
@@ -134,9 +120,7 @@ class SimpleServer(BaseHTTPRequestHandler):
                 """
 
             html += f"""
-                </div>
-
-                <div class="card" id="chat-section">
+                <div class="card">
                     <h2>Élő Chat & Válaszadás</h2>
                     <table>
                         <tr><th>Küldő</th><th>Célzott Ügyfél</th><th>Üzenet</th><th>Válasz küldése</th></tr>
@@ -226,6 +210,7 @@ class SimpleServer(BaseHTTPRequestHandler):
             chats = load_data(CHAT_FILE)
             if not isinstance(chats, list):
                 chats = []
+            # Jelöljük, hogy olvasatlan
             data["read"] = False
             chats.append(data)
             save_data(CHAT_FILE, chats)
@@ -235,6 +220,7 @@ class SimpleServer(BaseHTTPRequestHandler):
             self.wfile.write(b"Uzenet elmentve")
 
         elif self.path == "/get_messages":
+            # Az Android app le tudja kérdezni a saját üzeneteit és a műhely válaszait
             username = data.get("username", "")
             chats = load_data(CHAT_FILE)
             user_messages = [c for c in chats if c.get("sender") == username or c.get("target") == username or c.get("sender") == "Lenner Műhely"]
