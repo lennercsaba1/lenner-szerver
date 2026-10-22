@@ -86,21 +86,31 @@ class SimpleServer(BaseHTTPRequestHandler):
                     button {{ background: #FF8C00; color: #000; font-weight: bold; cursor: pointer; }}
                 </style>
                 <script>
-                    // 4 másodpercenként ellenőrzi, hogy van-e új üzenet, de NEM tölti újra az oldalt, ha éppen begépelsz valamit!
                     setInterval(function() {{
-                        fetch(window.location.href)
-                        .then(response => response.text())
-                        .then(html => {{
-                            // Csak akkor frissít, ha semelyik mezőbe sem írsz éppen be semmit
-                            let activeElement = document.activeElement;
-                            if (!activeElement || activeElement.tagName !== 'INPUT') {{
+                        let activeElement = document.activeElement;
+                        // Csak akkor frissítünk háttérben, ha az admin éppen nem gépel semmit
+                        if (!activeElement || activeElement.tagName !== 'INPUT') {{
+                            fetch(window.location.href)
+                            .then(response => response.text())
+                            .then(html => {{
                                 let parser = new DOMParser();
                                 let doc = parser.parseFromString(html, 'text/html');
                                 document.getElementById('chat-section').innerHTML = doc.getElementById('chat-section').innerHTML;
                                 document.getElementById('alert-box').innerHTML = doc.getElementById('alert-box').innerHTML;
-                            }}
-                        }});
+                            }});
+                        }}
                     }}, 4000);
+
+                    function acknowledgeAlert() {{
+                        var audio = document.getElementById('alertSound');
+                        if(audio) {{ audio.pause(); audio.currentTime = 0; }}
+                        document.getElementById('alert-box').innerHTML = ''; // Azonnal eltünteti a sávot
+                        
+                        fetch('/admin?pass=""" + ADMIN_SECRET + """&action=ack')
+                        .then(() => {{
+                            // Háttérben elmentve, nem kell teljes oldalújratöltés
+                        }});
+                    }}
                 </script>
             </head>
             <body>
@@ -120,10 +130,6 @@ class SimpleServer(BaseHTTPRequestHandler):
                     <button onclick="acknowledgeAlert()" style="font-size: 16px; padding: 10px 20px; background: #fff; color: #000;">Riasztás elnémítása / Olvasottá tétel</button>
                 </div>
                 <script>
-                    function acknowledgeAlert() {
-                        fetch('/admin?pass=""" + ADMIN_SECRET + """&action=ack')
-                        .then(() => { location.reload(); });
-                    }
                     document.addEventListener('click', () => {
                         var audio = document.getElementById('alertSound');
                         if(audio) audio.play();
@@ -232,13 +238,10 @@ class SimpleServer(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(b"Uzenet elmentve")
 
-        elif self.path == "get_messages": # implicit route match fix
-            pass
-
         elif self.path == "/get_messages":
             username = data.get("username", "")
             chats = load_data(CHAT_FILE)
-            user_messages = [c for c in chats if c.get("sender") == username or c.get("target") == username or c.get("sender") == "Lenner Műhely"]
+            user_messages = [c for c in chats if c.get("sender") == username or c.get("target"] == username or c.get("sender") == "Lenner Műhely"]
             
             self.send_response(200)
             self.send_header("Content-type", "application/json; charset=utf-8")
