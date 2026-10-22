@@ -176,35 +176,54 @@ class SimpleServer(BaseHTTPRequestHandler):
                 <script>
                     let currentChatUser = "";
                     let isChatOpen = false;
-                    let lastSeenTotalMessages = -1;
-                    let dismissedForThisCount = -1; // Ezzel szűrjük, hogy ha kiikszelted/lecsuktad, ne jöjjön vissza ugyanannyi üzenettel
+                    let userLastSeenCount = {{}}; // Felhasználónként tároljuk, hány üzenetet láttunk tőlük
+                    let dismissedCountPerUser = {{}}; // Felhasználónként tároljuk, aminél kiikszeltük/lecsuktuk
 
                     // Háttérben ellenőrizzük az üzeneteket
                     setInterval(function() {{
                         fetch('/admin_api_messages?pass={ADMIN_SECRET}')
                         .then(res => res.json())
                         .then(chats => {{
-                            let clientMessages = chats.filter(c => c.sender !== "Lenner Műhely");
-                            if (clientMessages.length === 0) return;
+                            // Kigyűjtjük ügyfelenként az üzeneteket
+                            let userMessages = {{}};
+                            chats.forEach(c => {{
+                                if (c.sender !== "Lenner Műhely" && c.sender) {{
+                                    if (!userMessages[c.sender]) userMessages[c.sender] = [];
+                                    userMessages[c.sender].push(c);
+                                }}
+                            }});
 
-                            let latest = clientMessages[clientMessages.length - 1];
-                            currentChatUser = latest.sender;
+                            // Megkeressük, van-e olyan ügyfél, akitől TÉNYLEG új üzenet jött (több van, mint amrég)
+                            let alertUser = "";
+                            for (let u in userMessages) {{
+                                let count = userMessages[u].length;
+                                if (!(u in userLastSeenCount)) {{
+                                    userLastSeenCount[u] = 0;
+                                }}
+                                if (count > userLastSeenCount[u] && count !== dismissedCountPerUser[u]) {{
+                                    alertUser = u;
+                                    break; // Megvan az első új üzenetet küldő
+                                }}
+                            }}
 
-                            // Ha több üzenet van összesen, mint amikor utoljára láttuk / bezártuk
-                            if (chats.length > lastSeenTotalMessages) {{
-                                if (chats.length !== dismissedForThisCount) {{
-                                    let notif = document.getElementById('float-notification');
-                                    if (!isChatOpen) {{
-                                        notif.innerText = "Új üzenet: " + currentChatUser;
-                                        notif.classList.add('blinking');
-                                        notif.style.display = 'flex';
-                                    }}
+                            let notif = document.getElementById('float-notification');
+
+                            if (alertUser) {{
+                                // Ha van új üzenet és nem ez a chat ablak van nyitva
+                                if (!isChatOpen || currentChatUser !== alertUser) {{
+                                    currentChatUser = alertUser;
+                                    notif.innerText = "Új üzenet: " + currentChatUser;
+                                    notif.classList.add('blinking');
+                                    notif.style.display = 'flex';
                                 }}
                             }}
 
                             // Ha nyitva van a chat ablak, frissítjük a buborékokat
                             if (isChatOpen && currentChatUser) {{
                                 renderChatMessages(chats, currentChatUser);
+                                if (userMessages[currentChatUser]) {{
+                                    userLastSeenCount[currentChatUser] = userMessages[currentChatUser].length;
+                                }}
                             }}
                         }}).catch(e => {{}});
                     }}, 3000);
@@ -214,15 +233,16 @@ class SimpleServer(BaseHTTPRequestHandler):
                         let modal = document.getElementById('chat-modal');
 
                         if (isChatOpen) {{
-                            // Lecsukás alulra: marad a buborék névvel, de nem villog többé ehhez az üzenethez
+                            // Lecsukás alulra: megjegyezzük az aktuális darabszámot, elhallgattatjuk a villogást
                             modal.style.display = 'none';
                             isChatOpen = false;
                             
                             fetch('/admin_api_messages?pass={ADMIN_SECRET}')
                             .then(res => res.json())
                             .then(chats => {{
-                                lastSeenTotalMessages = chats.length;
-                                dismissedForThisCount = chats.length;
+                                let userMsgs = chats.filter(c => c.sender === currentChatUser);
+                                userLastSeenCount[currentChatUser] = userMsgs.length;
+                                dismissedCountPerUser[currentChatUser] = userMsgs.length;
                             }});
 
                             if (currentChatUser) {{
@@ -235,14 +255,18 @@ class SimpleServer(BaseHTTPRequestHandler):
                             modal.style.display = 'flex';
                             isChatOpen = true;
 
-                            fetch('/admin_api_messages?pass={ADMIN_SECRET}')
-                            .then(res => res.json())
-                            .then(chats => {{
-                                lastSeenTotalMessages = chats.length;
-                                dismissedForThisCount = chats.length;
-                                renderChatMessages(chats, currentChatUser);
-                                fetch('/admin?pass={ADMIN_SECRET}&action=ack&user=' + encodeURIComponent(currentChatUser));
-                            }});
+                            if(currentChatUser) {{
+                                document.getElementById('chat-title').innerText = "Chat: " + currentChatUser;
+                                fetch('/admin_api_messages?pass={ADMIN_SECRET}')
+                                .then(res => res.json())
+                                .then(chats => {{
+                                    let userMsgs = chats.filter(c => c.sender === currentChatUser);
+                                    userLastSeenCount[currentChatUser] = userMsgs.length;
+                                    dismissedCountPerUser[currentChatUser] = userMsgs.length;
+                                    renderChatMessages(chats, currentChatUser);
+                                    fetch('/admin?pass={ADMIN_SECRET}&action=ack&user=' + encodeURIComponent(currentChatUser));
+                                }});
+                            }}
                         }}
                     }}
 
@@ -255,9 +279,10 @@ class SimpleServer(BaseHTTPRequestHandler):
                         fetch('/admin_api_messages?pass={ADMIN_SECRET}')
                         .then(res => res.json())
                         .then(chats => {{
-                            lastSeenTotalMessages = chats.length;
-                            dismissedForThisCount = chats.length;
                             if (currentChatUser) {{
+                                let userMsgs = chats.filter(c => c.sender === currentChatUser);
+                                userLastSeenCount[currentChatUser] = userMsgs.length;
+                                dismissedCountPerUser[currentChatUser] = userMsgs.length;
                                 fetch('/admin?pass={ADMIN_SECRET}&action=ack&user=' + encodeURIComponent(currentChatUser));
                             }}
                             currentChatUser = "";
@@ -290,8 +315,9 @@ class SimpleServer(BaseHTTPRequestHandler):
                             fetch('/admin_api_messages?pass={ADMIN_SECRET}')
                             .then(res => res.json())
                             .then(chats => {{
-                                lastSeenTotalMessages = chats.length;
-                                dismissedForThisCount = chats.length;
+                                let userMsgs = chats.filter(c => c.sender === currentChatUser);
+                                userLastSeenCount[currentChatUser] = userMsgs.length;
+                                dismissedCountPerUser[currentChatUser] = userMsgs.length;
                                 renderChatMessages(chats, currentChatUser);
                             }});
                         }});
@@ -312,7 +338,7 @@ class SimpleServer(BaseHTTPRequestHandler):
                         <tr><th>Felhasználónév</th><th>Jelszó</th><th>Akció</th></tr>
             """
             for user, pwd in users.items():
-                html += f"<tr><td>{user}</td><td>{pwd}</td><td><button onclick=\"currentChatUser='{user}'; document.getElementById('float-notification').innerText='{user}'; document.getElementById('float-notification').classList.remove('blinking'); document.getElementById('float-notification').style.display='flex'; document.getElementById('chat-modal').style.display='flex'; isChatOpen=true; document.getElementById('chat-title').innerText='Chat: {user}'; fetch('/admin_api_messages?pass={ADMIN_SECRET}').then(r=>r.json()).then(c=>{{ lastSeenTotalMessages=c.length; dismissedForThisCount=c.length; renderChatMessages(c,'{user}'); }}); fetch('/admin?pass={ADMIN_SECRET}&action=ack&user={user}');\">Üzenet küldése</button></td></tr>"
+                html += f"<tr><td>{user}</td><td>{pwd}</td><td><button onclick=\"currentChatUser='{user}'; document.getElementById('float-notification').innerText='{user}'; document.getElementById('float-notification').classList.remove('blinking'); document.getElementById('float-notification').style.display='flex'; document.getElementById('chat-modal').style.display='flex'; isChatOpen=true; document.getElementById('chat-title').innerText='Chat: {user}'; fetch('/admin_api_messages?pass={ADMIN_SECRET}').then(r=>r.json()).then(c=>{{ let uMsgs=c.filter(x=>x.sender==='{user}'); userLastSeenCount['{user}']=uMsgs.length; dismissedCountPerUser['{user}']=uMsgs.length; renderChatMessages(c,'{user}'); }}); fetch('/admin?pass={ADMIN_SECRET}&action=ack&user={user}');\">Üzenet küldése</button></td></tr>"
             html += f"""
                     </table>
                 </div>
@@ -342,7 +368,6 @@ class SimpleServer(BaseHTTPRequestHandler):
             """
             self.wfile.write(html.encode('utf-8'))
 
-        # Segéd funkció a chat olvasottá tételhez háttérből
         elif path == "/admin" and query.get("action") == ["ack"]:
             target_user = query.get("user", [""])[0]
             chats = load_data(CHAT_FILE)
@@ -409,7 +434,7 @@ class SimpleServer(BaseHTTPRequestHandler):
         elif self.path == "/get_messages":
             username = data.get("username", "")
             chats = load_data(CHAT_FILE)
-            user_messages = [c for c in chats if c.get("sender") == username or c.get("target"] == username or c.get("sender"] == "Lenner Műhely"]
+            user_messages = [c for c in chats if c.get("sender"] == username or c.get("target") == username or c.get("sender"] == "Lenner Műhely"]
             
             self.send_response(200)
             self.send_header("Content-type", "application/json; charset=utf-8")
