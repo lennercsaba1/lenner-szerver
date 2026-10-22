@@ -55,7 +55,7 @@ class SimpleServer(BaseHTTPRequestHandler):
                 self.end_headers()
                 return
 
-            # Admin megnyitásakor olvasottá tesszük a régieket, hogy ne szóljon a riasztás
+            # Admin megnyitásakor olvasottá tesszük a régieket
             chats = load_data(CHAT_FILE)
             for msg in chats:
                 if msg.get("sender") != "Lenner Műhely":
@@ -83,10 +83,9 @@ class SimpleServer(BaseHTTPRequestHandler):
                     button {{ background: #FF8C00; color: #000; font-weight: bold; cursor: pointer; }}
                 </style>
                 <script>
-                    // Háttérben lekérdezzük az üzeneteket JSON-ben, így nem rántjuk szét az oldalt és a gépelést sem töröljük ki!
+                    // Háttérben lekérdezzük az üzeneteket JSON-ben, amíg nem gépelsz a mezőbe
                     setInterval(function() {{
                         let activeInput = document.activeElement;
-                        // HA éppen belemértél egy szövegmezőbe és gépelsz, SEMMI CSETRE SEM FRISSÍTÜNK!
                         if (activeInput && activeInput.tagName === 'INPUT' && activeInput.type === 'text') {{
                             return; 
                         }}
@@ -173,7 +172,6 @@ class SimpleServer(BaseHTTPRequestHandler):
             """
             self.wfile.write(html.encode('utf-8'))
 
-        # Külön végpont a háttérbeli JSON chat frissítéshez (ez nem bántja a gépelést)
         elif path == "/admin_api_messages":
             password = query.get("pass", [""])[0]
             if password != ADMIN_SECRET:
@@ -242,7 +240,7 @@ class SimpleServer(BaseHTTPRequestHandler):
         elif self.path == "/get_messages":
             username = data.get("username", "")
             chats = load_data(CHAT_FILE)
-            user_messages = [c for c in chats if c.get("sender") == username or c.get("target"] == username or c.get("sender"] == "Lenner Műhely"]
+            user_messages = [c for c in chats if c.get("sender") == username or c.get("target") == username or c.get("sender"] == "Lenner Műhely"]
             
             self.send_response(200)
             self.send_header("Content-type", "application/json; charset=utf-8")
