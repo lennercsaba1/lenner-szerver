@@ -595,7 +595,6 @@ class SimpleServer(BaseHTTPRequestHandler):
                                 return;
                             }}
 
-                            // Word által nyitható HTML formátumú .doc tartalom összeállítása
                             let docContent = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/1999/xhtml">
                             <head><meta charset="utf-8"><title>Napló - ${{currentLogUser}}</title></head>
                             <body style="font-family: Arial, sans-serif; color: #000; padding: 20px;">
@@ -614,7 +613,6 @@ class SimpleServer(BaseHTTPRequestHandler):
 
                             docContent += `</div></body></html>`;
 
-                            // Letöltési Blob létrehozása és ablak felhívása
                             let blob = new Blob(['\\ufeff' + docContent], {{ type: 'application/msword;charset=utf-8' }});
                             let url = URL.createObjectURL(blob);
                             let a = document.createElement('a');
@@ -829,7 +827,7 @@ class SimpleServer(BaseHTTPRequestHandler):
             user_messages = [
                 c for c in chats 
                 if c.get("sender") == username or 
-                   (c.get("sender") == "Lenner Műhely" && c.get("target") == username)
+                   (c.get("sender") == "Lenner Műhely" and c.get("target") == username)
             ]
             
             self.send_response(200)
