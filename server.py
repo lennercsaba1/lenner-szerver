@@ -36,16 +36,14 @@ class SimpleServer(BaseHTTPRequestHandler):
 
             action = query.get("action", [""])[0]
             
-            # Ha rákattint a gombra, olvasottá tesszük és visszairányítjuk az adminra (ez azonnal elnémítja és frissít)
             if action == "ack":
                 chats = load_data(CHAT_FILE)
                 for msg in chats:
                     msg["read"] = True
                 save_data(CHAT_FILE, chats)
-                
-                self.send_response(302)
-                self.send_header('Location', f'/admin?pass={ADMIN_SECRET}')
+                self.send_response(200)
                 self.end_headers()
+                self.wfile.write(b"OK")
                 return
 
             if action == "reply":
@@ -60,10 +58,9 @@ class SimpleServer(BaseHTTPRequestHandler):
                         "read": True
                     })
                     save_data(CHAT_FILE, chats)
-                
-                self.send_response(302)
-                self.send_header('Location', f'/admin?pass={ADMIN_SECRET}')
+                self.send_response(200)
                 self.end_headers()
+                self.wfile.write(b"OK")
                 return
 
             users = load_data(DB_FILE)
@@ -89,7 +86,6 @@ class SimpleServer(BaseHTTPRequestHandler):
                     button {{ background: #FF8C00; color: #000; font-weight: bold; cursor: pointer; }}
                 </style>
                 <script>
-                    // Háttérben frissíti az adatokat, amíg nem gépelsz
                     setInterval(function() {{
                         let activeElement = document.activeElement;
                         if (!activeElement || activeElement.tagName !== 'INPUT') {{
@@ -103,6 +99,14 @@ class SimpleServer(BaseHTTPRequestHandler):
                             }});
                         }}
                     }}, 4000);
+
+                    function acknowledgeAlert() {{
+                        fetch('/admin?pass=""" + ADMIN_SECRET + """&action=ack')
+                        .then(() => {{
+                            // Azonnal újratölti az oldalt, így a hang is törlődik a memóriából, de mivel olvasott, nem visít tovább
+                            location.reload();
+                        }});
+                    }}
                 </script>
             </head>
             <body>
@@ -112,16 +116,14 @@ class SimpleServer(BaseHTTPRequestHandler):
             """
 
             if has_unread:
-                html += f"""
+                html += """
                 <audio id="alertSound" loop autoplay>
                     <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
                 </audio>
                 <div style="background: #D35400; color: #fff; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-weight: bold; font-size: 18px; text-align: center;">
                     ⚠️ ÚJ ÜZENET ÉRKEZETT! A riasztás szól, amíg rá nem kattintasz a nyugtázásra!
                     <br><br>
-                    <a href="/admin?pass={ADMIN_SECRET}&action=ack">
-                        <button style="font-size: 16px; padding: 10px 20px; background: #fff; color: #000;">Riasztás elnémítása / Olvasottá tétel</button>
-                    </a>
+                    <button onclick="acknowledgeAlert()" style="font-size: 16px; padding: 10px 20px; background: #fff; color: #000;">Riasztás elnémítása / Olvasottá tétel</button>
                 </div>
                 <script>
                     document.addEventListener('click', () => {
@@ -235,7 +237,7 @@ class SimpleServer(BaseHTTPRequestHandler):
         elif self.path == "/get_messages":
             username = data.get("username", "")
             chats = load_data(CHAT_FILE)
-            user_messages = [c for c in chats if c.get("sender"] == username or c.get("target") == username or c.get("sender"] == "Lenner Műhely"]
+            user_messages = [c for c in chats if c.get("sender") == username or c.get("target") == username or c.get("sender") == "Lenner Műhely"]
             
             self.send_response(200)
             self.send_header("Content-type", "application/json; charset=utf-8")
