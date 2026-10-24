@@ -143,7 +143,6 @@ class SimpleServer(BaseHTTPRequestHandler):
             users_table_html = ""
             now = datetime.now()
             if isinstance(users, dict):
-                # Felhasználók összegyűjtése és rendezése: Online elöl, azután ABC sorrend
                 user_list = []
                 for user, pwd in users.items():
                     is_online = False
@@ -156,10 +155,11 @@ class SimpleServer(BaseHTTPRequestHandler):
                 for user, pwd, is_online in sorted_users:
                     dot_class = "status-dot status-online" if is_online else "status-dot status-offline"
 
-                    users_table_html += f"""<tr>
+                    # Felhasználói sor + közvetlenül alatt a rejtett "Cím" lenyíló sor
+                    users_table_html += f"""<tr data-user-row data-username="{user}">
                 <td>
                     <div class="user-row-wrapper">
-                        <span id="status-dot-{user}" class="{dot_class}" title="Státusz"></span>
+                        <span id="status-dot-{user}" class="{dot_class}" title="Státusz" data-online="{1 if is_online else 0}"></span>
                         {user}
                     </div>
                 </td>
@@ -167,10 +167,18 @@ class SimpleServer(BaseHTTPRequestHandler):
                 <td>
                     <button onclick="createOrUpdateBubble('{user}', false); toggleUserChat('{user}');">Chat nyitása</button>
                     <button class="btn-log" onclick="toggleLoggedChats('{user}')">Naplózott beszélgetés</button>
+                    <button class="btn-title-tab" onclick="toggleUserTitleTab('{user}')">Cím</button>
                 </td>
                 <td style="text-align: right;">
                     <button class="btn-clear-chat" onclick="confirmClearChat('{user}')">Chat törlése</button>
                     <button class="btn-delete" onclick="confirmDelete('{user}')">X Törlés</button>
+                </td>
+            </tr>
+            <tr id="title-dropdown-{user}" class="inline-dropdown-row" style="display: none;" data-user-row data-username="{user}">
+                <td colspan="4" style="padding: 0; border-top: none;">
+                    <div class="inline-dropdown-content">
+                        <p style="margin: 0; color: #888; text-align: center;">Lenner Gumiszerviz - Cím ablak ({user})</p>
+                    </div>
                 </td>
             </tr>"""
 
@@ -264,7 +272,7 @@ class SimpleServer(BaseHTTPRequestHandler):
             
             user_messages = [
                 c for c in chats 
-                if c.get("sender") == username or 
+                if c.get("sender"] == username or 
                    (c.get("sender") == "Lenner Műhely" and c.get("target") == username)
             ]
             
