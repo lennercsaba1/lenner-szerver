@@ -8,9 +8,11 @@ def get_admin_html(user_count, admin_secret, users_table_html):
         body {{ font-family: Arial; background: #121212; color: #fff; padding: 20px; margin: 0; }}
         .header-container {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }}
         h1, h2 {{ color: #FF8C00; margin: 0; }}
+        
         table {{ border-collapse: collapse; width: 100%; margin-bottom: 20px; background: #1E1E1E; }}
         th, td {{ border: 1px solid #444; padding: 10px; text-align: left; }}
         th {{ background: #222; }}
+        
         .card {{ background: #1E1E1E; padding: 15px; border-radius: 8px; margin-bottom: 20px; }}
         input, button {{ padding: 8px; margin: 4px 0; background: #222; color: #fff; border: 1px solid #FF8C00; border-radius: 4px; }}
         button {{ background: #FF8C00; color: #000; font-weight: bold; cursor: pointer; }}
@@ -26,14 +28,17 @@ def get_admin_html(user_count, admin_secret, users_table_html):
 
         .sound-toggle-btn {{ background: #222; color: #FF8C00; border: 1px solid #FF8C00; padding: 8px 15px; font-weight: bold; border-radius: 6px; cursor: pointer; }}
 
-        /* Státusz pöttyök stílusa */
+        .user-row-wrapper {{
+            position: relative;
+            display: flex;
+            align-items: center;
+        }}
         .status-dot {{
-            display: inline-block;
+            position: absolute;
+            left: -22px;
             width: 12px;
             height: 12px;
             border-radius: 50%;
-            margin-right: 8px;
-            vertical-align: middle;
         }}
         .status-online {{ background-color: #2ECC71; box-shadow: 0 0 8px #2ECC71; }}
         .status-offline {{ background-color: #E74C3C; }}
@@ -184,22 +189,48 @@ def get_admin_html(user_count, admin_secret, users_table_html):
                 }}
             }}).catch(e => {{}});
 
-            // Státuszok lekérdezése és frissítése valós időben
+            // Státuszok lekérdezése, pöttyök frissítése és a táblázat sorainak átrendezése élőben
             fetch('/admin_api_status?pass={admin_secret}')
             .then(res => res.json())
             .then(statuses => {{
+                let tbody = document.getElementById('users-tbody');
+                if (!tbody) return;
+                
                 for (let user in statuses) {{
                     let dot = document.getElementById('status-dot-' + user);
                     if (dot) {{
                         if (statuses[user]) {{
                             dot.className = "status-dot status-online";
                             dot.title = "Online (Aktív)";
+                            dot.setAttribute('data-online', '1');
                         }} else {{
                             dot.className = "status-dot status-offline";
                             dot.title = "Offline (Inaktív)";
+                            dot.setAttribute('data-online', '0');
                         }}
                     }}
                 }}
+
+                // Sorok átrendezése: online (1) elöl, azon belül név szerint ABC
+                let rows = Array.from(tbody.getElementsByTagName('tr'));
+                rows.sort((a, b) => {{
+                    let dotA = a.querySelector('.status-dot');
+                    let dotB = b.querySelector('.status-dot');
+                    let onA = dotA ? parseInt(dotA.getAttribute('data-online') || '0') : 0;
+                    let onB = dotB ? parseInt(dotB.getAttribute('data-online') || '0') : 0;
+
+                    if (onA !== onB) {{
+                        return onB - onA; // Online (1) előre kerül a offline-hoz (0) képest
+                    }}
+                    // Ha azonos a státusz, jöjjön az ABC sorrend név szerint
+                    let nameA = a.cells[0].innerText.trim().toLowerCase();
+                    let nameB = b.cells[0].innerText.trim().toLowerCase();
+                    return nameA.localeCompare(nameB);
+                }});
+
+                // Újrahozzáadjuk a rendezett sorokat a táblázathoz
+                rows.forEach(r => tbody.appendChild(r));
+
             }}).catch(e => {{}});
         }}
 
@@ -244,7 +275,7 @@ def get_admin_html(user_count, admin_secret, users_table_html):
                     bubble.classList.remove('blinking');
                 }}
                 fetch('/admin_api_messages?pass={admin_secret}')
-                .then(res => res.json())
+                .then(res=> res.json())
                 .then(chats => {{
                     let uMsgs = chats.filter(c => c.sender === username);
                     userLastSeenCount[username] = uMsgs.length;
@@ -348,7 +379,7 @@ def get_admin_html(user_count, admin_secret, users_table_html):
                 let blob = new Blob(['\\ufeff' + docContent], {{ type: 'application/msword;charset=utf-8' }});
                 let url = URL.createObjectURL(blob);
                 let a = document.createElement('a');
-                a.href  = url;
+                a.href = url;
                 a.download = 'naplo_' + currentLogUser + '.doc';
                 document.body.appendChild(a);
                 a.click();
@@ -438,8 +469,12 @@ def get_admin_html(user_count, admin_secret, users_table_html):
     <div id="client-registry-card" class="card" style="display: none !important;">
         <h2>Regisztrált Felhasználók ({user_count})</h2>
         <table>
-            <tr><th>Felhasználónév</th><th>Jelszó</th><th>Üzenetek kezelése</th><th style="text-align: right;">Műveletek</th></tr>
-            {users_table_html}
+            <thead>
+                <tr><th>Felhasználónév</th><th>Jelszó</th><th>Üzenetek kezelése</th><th style="text-align: right;">Műveletek</th></tr>
+            </thead>
+            <tbody id="users-tbody">
+                {users_table_html}
+            </tbody>
         </table>
     </div>
 
