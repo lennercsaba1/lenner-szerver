@@ -1,12 +1,15 @@
 from http.server import BaseHTTPRequestHandler
 import json
 import urllib.parse
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from database import load_data, save_data, DB_FILE, CHAT_FILE, LOG_FILE
 from admin_template import get_admin_html
 
 ADMIN_SECRET = "lenneradmin123"
+
+# Tárolja az ügyfelek utolsó aktivitásának idejét: {{ "felhasznalonev": datetime }}
+user_last_activity = {}
 
 class SimpleServer(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -38,6 +41,32 @@ class SimpleServer(BaseHTTPRequestHandler):
             self.send_header("Content-type", "application/json; charset=utf-8")
             self.end_headers()
             self.wfile.write(json.dumps(logs, ensure_ascii=False).encode('utf-8'))
+            return
+
+        # Új API endpoint az online státuszokhoz
+        if path == "/admin_api_status":
+            password = query.get("pass", [""])[0]
+            if password != ADMIN_SECRET:
+                self.send_response(401)
+                self.end_headers()
+                return
+            
+            users = load_data(DB_FILE)
+            now = datetime.now()
+            status_dict = {}
+            if isinstance(users, dict):
+                for user in users.keys():
+                    if user in user_last_activity:
+                        # Ha 60 másodpercen belül volt aktivitás, akkor online (True), különben offline (False)
+                        is_online = (now - user_last_activity[user]) < timedelta(seconds=60)
+                        status_dict[user] = is_online
+                    else:
+                        status_dict[user] = False
+
+            self.send_response(200)
+            self.send_header("Content-type", "application/json; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(json.dumps(status_dict, ensure_ascii=False).encode('utf-8'))
             return
 
         if path == "/admin":
@@ -86,6 +115,9 @@ class SimpleServer(BaseHTTPRequestHandler):
                     chats = load_data(CHAT_FILE)
                     filtered_chats = [c for c in chats if c.get("sender") != target_user and c.get("target") != target_user]
                     save_data(CHAT_FILE, filtered_chats)
+                    
+                    if target_user in user_last_activity:
+                        del user_last_activity[target_user]
                 
                 self.send_response(302)
                 self.send_header('Location', f'/admin?pass={ADMIN_SECRET}')
@@ -112,10 +144,18 @@ class SimpleServer(BaseHTTPRequestHandler):
             user_count = len(users) if isinstance(users, dict) else 0
             
             users_table_html = ""
+            now = datetime.now()
             if isinstance(users, dict):
                 for user, pwd in users.items():
+                    # Ellenőrizzük az alapértelmezett státuszt betöltéskor is
+                    is_online = False
+                    if user in user_last_activity:
+                        is_online = (now - user_last_activity[user]) < timedelta(seconds=60)
+                    
+                    dot_class = "status-dot status-online" if is_online else "status-dot status-offline"
+
                     users_table_html += f"""<tr>
-                <td>{user}</td>
+                <td><span id="status-dot-{user}" class="{dot_class}"></span>{user}</td>
                 <td>{pwd}</td>
                 <td>
                     <button onclick="createOrUpdateBubble('{user}', false); toggleUserChat('{user}');">Chat nyitása</button>
@@ -174,6 +214,8 @@ class SimpleServer(BaseHTTPRequestHandler):
             username = data.get("username")
             password = data.get("password")
             if username in users and users[username] == password:
+                # Sikeres bejelentkezés frissíti az aktivitást is
+                user_last_activity[username] = datetime.now()
                 self.send_response(200)
                 self.end_headers()
                 self.wfile.write(b"Sikeres belepes")
@@ -182,6 +224,10 @@ class SimpleServer(BaseHTTPRequestHandler):
                 self.end_headers()
 
         elif self.path == "/chat":
+            username = data.get("sender")
+            if username:
+                user_last_activity[username] = datetime.now()
+
             chats = load_data(CHAT_FILE)
             if not isinstance(chats, list):
                 chats = []
@@ -205,11 +251,14 @@ class SimpleServer(BaseHTTPRequestHandler):
 
         elif self.path == "/get_messages":
             username = data.get("username", "")
+            if username:
+                user_last_activity[username] = datetime.now()
+
             chats = load_data(CHAT_FILE)
             
             user_messages = [
                 c for c in chats 
-                if c.get("sender") == username or 
+                if c.get("sender"] == username or 
                    (c.get("sender") == "Lenner Műhely" and c.get("target") == username)
             ]
             
