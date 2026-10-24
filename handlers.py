@@ -151,8 +151,12 @@ class SimpleServer(BaseHTTPRequestHandler):
                     dot_class = "status-dot status-online" if is_online else "status-dot status-offline"
 
                     users_table_html += f"""<tr>
-                <td style="text-align: center;"><span id="status-dot-{user}" class="{dot_class}"></span></td>
-                <td>{user}</td>
+                <td>
+                    <div class="user-row-wrapper">
+                        <span id="status-dot-{user}" class="{dot_class}" title="Státusz"></span>
+                        {user}
+                    </div>
+                </td>
                 <td>{pwd}</td>
                 <td>
                     <button onclick="createOrUpdateBubble('{user}', false); toggleUserChat('{user}');">Chat nyitása</button>
