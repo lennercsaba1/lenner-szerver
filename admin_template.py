@@ -29,8 +29,8 @@ def get_admin_html(user_count, admin_secret, users_table_html):
         .btn-title-tab {{ background: #FF8C00; color: #000; border: none; padding: 6px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; margin-left: 6px; }}
         .btn-title-tab:hover {{ background: #FFA500; }}
 
-        /* Zöld színű Számla kiállítás gomb stílusa (műveletek oszlop bal szélére) */
-        .btn-invoice-tab {{ background: #27AE60; color: #fff; border: none; padding: 5px 10px; border-radius: 4px; font-weight: bold; cursor: pointer; margin-right: 5px; }}
+        /* Zöld színű Számla kiállítás gomb stílusa */
+        .btn-invoice-tab {{ background: #27AE60; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; margin-right: 6px; }}
         .btn-invoice-tab:hover {{ background: #2ECC71; }}
 
         .sound-toggle-btn {{ background: #222; color: #FF8C00; border: 1px solid #FF8C00; padding: 8px 15px; font-weight: bold; border-radius: 6px; cursor: pointer; }}
@@ -503,7 +503,7 @@ def get_admin_html(user_count, admin_secret, users_table_html):
         <h2>Regisztrált Felhasználók ({user_count})</h2>
         <table>
             <thead>
-                <tr><th>Felhasználónév</th><th>Jelszó</th><th>Üzenetek kezelése</th><th style="text-align: right;">Műveletek</th></tr>
+                <tr><th>Felhasználónév</th><th>Jelszó</th><th>Számla kiállítás</th><th>Üzenetek kezelése</th><th style="text-align: right;">Műveletek</th></tr>
             </thead>
             <tbody id="users-tbody">
                 {users_table_html}
