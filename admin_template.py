@@ -26,16 +26,16 @@ def get_admin_html(user_count, admin_secret, users_table_html):
 
         .sound-toggle-btn {{ background: #222; color: #FF8C00; border: 1px solid #FF8C00; padding: 8px 15px; font-weight: bold; border-radius: 6px; cursor: pointer; }}
 
-        /* Státusz pöttyök stílusa */
+        /* Státusz pöttyök stílusa - táblázaton kívüli bal oldali elhelyezéshez */
         .status-dot {{
             display: inline-block;
-            width: 12px;
-            height: 12px;
+            width: 14px;
+            height: 14px;
             border-radius: 50%;
-            margin-right: 8px;
+            margin-right: 12px;
             vertical-align: middle;
         }}
-        .status-online {{ background-color: #2ECC71; box-shadow: 0 0 8px #2ECC71; }}
+        .status-online {{ background-color: #2ECC71; box-shadow: 0 0 10px #2ECC71; }}
         .status-offline {{ background-color: #E74C3C; }}
 
         #log-sidebar {{
@@ -348,7 +348,7 @@ def get_admin_html(user_count, admin_secret, users_table_html):
                 let blob = new Blob(['\\ufeff' + docContent], {{ type: 'application/msword;charset=utf-8' }});
                 let url = URL.createObjectURL(blob);
                 let a = document.createElement('a');
-                a.href  = url;
+                a.href = url;
                 a.download = 'naplo_' + currentLogUser + '.doc';
                 document.body.appendChild(a);
                 a.click();
@@ -438,7 +438,7 @@ def get_admin_html(user_count, admin_secret, users_table_html):
     <div id="client-registry-card" class="card" style="display: none !important;">
         <h2>Regisztrált Felhasználók ({user_count})</h2>
         <table>
-            <tr><th>Felhasználónév</th><th>Jelszó</th><th>Üzenetek kezelése</th><th style="text-align: right;">Műveletek</th></tr>
+            <tr><th style="width: 40px; text-align: center;">Státusz</th><th>Felhasználónév</th><th>Jelszó</th><th>Üzenetek kezelése</th><th style="text-align: right;">Műveletek</th></tr>
             {users_table_html}
         </table>
     </div>
