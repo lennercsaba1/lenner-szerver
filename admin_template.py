@@ -26,36 +26,11 @@ def get_admin_html(user_count, admin_secret, users_table_html):
         .btn-log {{ background: #FF8C00; color: #000; border: none; padding: 6px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; margin-left: 8px; }}
         .btn-log:hover {{ background: #FFA500; }}
 
-        .sound-toggle-btn {{ background: #222; color: #FF8C00; border: 1px solid #FF8C00; padding: 8px 15px; font-weight: bold; border-radius: 6px; cursor: pointer; }}
+        /* Új "Cím" gomb stílusa a naplózott beszélgetés fül mellett */
+        .btn-title-tab {{ background: #2980B9; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; margin-left: 6px; }}
+        .btn-title-tab:hover {{ background: #3498DB; }}
 
-        /* Új lenyíló ablak stílusa a táblázat alatt, a táblázat jobb széléig tartó szélességgel */
-        #custom-tab-container {{
-            width: 100%;
-            background: #1A1A1A;
-            border: 2px solid #FF8C00;
-            border-radius: 8px;
-            margin-top: -10px;
-            margin-bottom: 20px;
-            display: none;
-            box-sizing: border-box;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-        }}
-        #custom-tab-header {{
-            background: #222;
-            padding: 10px 15px;
-            color: #FF8C00;
-            font-weight: bold;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-top-left-radius: 6px;
-            border-top-right-radius: 6px;
-        }}
-        #custom-tab-body {{
-            padding: 20px;
-            color: #ccc;
-            min-height: 80px;
-        }}
+        .sound-toggle-btn {{ background: #222; color: #FF8C00; border: 1px solid #FF8C00; padding: 8px 15px; font-weight: bold; border-radius: 6px; cursor: pointer; }}
 
         .user-row-wrapper {{
             position: relative;
@@ -71,6 +46,21 @@ def get_admin_html(user_count, admin_secret, users_table_html):
         }}
         .status-online {{ background-color: #2ECC71; box-shadow: 0 0 8px #2ECC71; }}
         .status-offline {{ background-color: #E74C3C; }}
+
+        /* Sor alatti lenyíló ablak stílusa */
+        .inline-dropdown-row {{
+            background: #181818;
+        }}
+        .inline-dropdown-content {{
+            padding: 15px;
+            border: 2px solid #FF8C00;
+            border-top: none;
+            background: #1A1A1A;
+            color: #ccc;
+            box-sizing: border-box;
+            border-bottom-left-radius: 6px;
+            border-bottom-right-radius: 6px;
+        }}
 
         #log-sidebar {{
             position: fixed; top: 20px; right: 20px; width: 440px; height: calc(100vh - 100px);
@@ -173,13 +163,15 @@ def get_admin_html(user_count, admin_secret, users_table_html):
             }}
         }}
 
-        // Új funkció az új fül lenyitásához/becsukásához
-        function toggleCustomTab() {{
-            let container = document.getElementById('custom-tab-container');
-            if (container.style.display === 'none' || container.style.display === '') {{
-                container.style.display = 'block';
-            }} else {{
-                container.style.display = 'none';
+        // Felhasználóhoz tartozó "Cím" lenyíló ablak kezelése
+        function toggleUserTitleTab(username) {{
+            let dropdownRow = document.getElementById('title-dropdown-' + username);
+            if (dropdownRow) {{
+                if (dropdownRow.style.display === 'none' || dropdownRow.style.display === '') {{
+                    dropdownRow.style.display = 'table-row';
+                }} else {{
+                    dropdownRow.style.display = 'none';
+                }}
             }}
         }}
 
@@ -249,7 +241,10 @@ def get_admin_html(user_count, admin_secret, users_table_html):
                     }}
                 }}
 
-                let rows = Array.from(tbody.getElementsByTagName('tr'));
+                // Sorok átrendezése úgy, hogy a lenyíló sávok együtt maradjanak a felhasználóval
+                let tbodyElem = document.getElementById('users-tbody');
+                let rows = Array.from(tbodyElem.querySelectorAll('tr[data-user-row]'));
+                
                 rows.sort((a, b) => {{
                     let dotA = a.querySelector('.status-dot');
                     let dotB = b.querySelector('.status-dot');
@@ -259,12 +254,19 @@ def get_admin_html(user_count, admin_secret, users_table_html):
                     if (onA !== onB) {{
                         return onB - onA;
                     }}
-                    let nameA = a.cells[0].innerText.trim().toLowerCase();
-                    let nameB = b.cells[0].innerText.trim().toLowerCase();
+                    let nameA = a.getAttribute('data-username').toLowerCase();
+                    let nameB = b.getAttribute('data-username').toLowerCase();
                     return nameA.localeCompare(nameB);
                 }});
 
-                rows.forEach(r => tbody.appendChild(r));
+                rows.forEach(r => {{
+                    let username = r.getAttribute('data-username');
+                    let dropdown = document.getElementById('title-dropdown-' + username);
+                    tbodyElem.appendChild(r);
+                    if (dropdown) {{
+                        tbodyElem.appendChild(dropdown);
+                    }}
+                }});
 
             }}).catch(e => {{}});
         }}
@@ -511,24 +513,6 @@ def get_admin_html(user_count, admin_secret, users_table_html):
                 {users_table_html}
             </tbody>
         </table>
-        
-        <!-- Új fül / gomb és a lenyíló ablak a táblázat alján, pontosan a táblázat szélességéhez igazítva -->
-        <div style="margin-top: 10px;">
-            <button onclick="toggleCustomTab()" style="background: #333; color: #FF8C00; border: 1px solid #FF8C00; padding: 8px 16px; font-weight: bold; border-radius: 4px; cursor: pointer;">
-                📂 Cím (Új fül)
-            </button>
-        </div>
-        
-        <div id="custom-tab-container">
-            <div id="custom-tab-header">
-                <span>Cím Panel</span>
-                <button onclick="toggleCustomTab()" style="background: #444; color: #fff; padding: 2px 8px; margin:0; border:none;">X</button>
-            </div>
-            <div id="custom-tab-body">
-                <!-- Itt van az üres ablak -->
-                <p style="margin: 0; color: #888; text-align: center;">Ez az ablak jelenleg üres.</p>
-            </div>
-        </div>
     </div>
 
     <!-- JOBB OLDALI NAPLÓZOTT BESZÉLGETÉS SÁV -->
