@@ -176,12 +176,16 @@ class SimpleServer(BaseHTTPRequestHandler):
                         </div>
                     </div>
                 </td>
-                <td style="text-align: right;">
-                    <button class="btn-invoice-tab" onclick="toggleUserInvoiceTab('{user}')">Számla kiállítás</button>
-                    <button class="btn-clear-chat" onclick="confirmClearChat('{user}')">Chat törlése</button>
-                    <button class="btn-delete" onclick="confirmDelete('{user}')">X Törlés</button>
+                <td>
+                    <div style="display: flex; align-items: center; width: 100%;">
+                        <button class="btn-invoice-tab" onclick="toggleUserInvoiceTab('{user}')">Számla kiállítás</button>
+                        <div style="margin-left: auto; display: flex; gap: 5px;">
+                            <button class="btn-clear-chat" onclick="confirmClearChat('{user}')">Chat törlése</button>
+                            <button class="btn-delete" onclick="confirmDelete('{user}')">X Törlés</button>
+                        </div>
+                    </div>
                     
-                    <div id="invoice-panel-{user}" class="invoice-panel" style="text-align: left;">
+                    <div id="invoice-panel-{user}" class="invoice-panel">
                         <div style="display: flex; flex-direction: column; gap: 4px;">
                             <div><strong>Számla kiállítás panel</strong></div>
                         </div>
