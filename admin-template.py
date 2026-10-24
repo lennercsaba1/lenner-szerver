@@ -15,44 +15,6 @@ def get_admin_html(user_count, admin_secret):
         input, button {{ padding: 8px; margin: 4px 0; background: #222; color: #fff; border: 1px solid #FF8C00; border-radius: 4px; }}
         button {{ background: #FF8C00; color: #000; font-weight: bold; cursor: pointer; }}
         
-        /* ÚJ: Ügyfél nyilvántartás téglalap gomb stílusa */
-        .btn-client-registry {{
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            background: #1E1E1E;
-            color: #FF8C00;
-            border: 2px solid #FF8C00;
-            padding: 18px 25px;
-            font-size: 18px;
-            font-weight: bold;
-            border-radius: 8px;
-            cursor: pointer;
-            width: 100%;
-            max-width: 400px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-            transition: all 0.2s ease-in-out;
-            margin-bottom: 20px;
-        }}
-        .btn-client-registry:hover {{
-            background: #FF8C00;
-            color: #000;
-            transform: translateY(-2px);
-            box-shadow: 0 6px 16px rgba(255, 140, 0, 0.3);
-        }}
-        .badge-count {{
-            background: #222;
-            color: #fff;
-            padding: 4px 10px;
-            border-radius: 12px;
-            font-size: 14px;
-            border: 1px solid #FF8C00;
-        }}
-        .btn-client-registry:hover .badge-count {{
-            background: #000;
-            color: #FF8C00;
-        }}
-
         .btn-delete {{ background: #C0392B; color: #fff; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-weight: bold; }}
         .btn-delete:hover {{ background: #E74C3C; }}
 
@@ -120,19 +82,6 @@ def get_admin_html(user_count, admin_secret):
         let userLastSeenCount = getStorage('userLastSeenCount');
         let persistentBubbles = getStorage('persistentBubbles');
 
-        /* ÚJ: Ügyfél nyilvántartás panel ki/bekapcsolása */
-        function toggleClientRegistry() {{
-            let card = document.getElementById('client-registry-card');
-            let btnText = document.getElementById('registry-btn-text');
-            if (card.style.display === 'none' || card.style.display === '') {{
-                card.style.display = 'block';
-                btnText.innerText = '📁 Ügyfél nyilvántartás bezárása ▲';
-            }} else {{
-                card.style.display = 'none';
-                btnText.innerText = '📁 Ügyfél nyilvántartás ▼';
-            }}
-        }}
-
         function playNotificationSound() {{
             if (!soundEnabled) return;
             try {{
@@ -166,6 +115,15 @@ def get_admin_html(user_count, admin_secret):
                 btn.innerText = "🔇 Hang: KI";
                 btn.style.borderColor = "#777";
                 btn.style.color = "#777";
+            }}
+        }}
+
+        function toggleClientRegistry() {{
+            let card = document.getElementById('client-registry-card');
+            if (card.style.display === 'none' || card.style.display === 'none !important' || card.style.display === '') {{
+                card.style.setProperty('display', 'block', 'important');
+            }} else {{
+                card.style.setProperty('display', 'none', 'important');
             }}
         }}
 
@@ -441,14 +399,13 @@ def get_admin_html(user_count, admin_secret):
         <button id="sound-btn" class="sound-toggle-btn" onclick="toggleSound()">🔊 Hang: BE</button>
     </div>
     
-    <!-- ÚJ: Ügyfél nyilvántartás nyitó téglalap gomb -->
-    <div class="btn-client-registry" onclick="toggleClientRegistry()">
-        <span id="registry-btn-text">📁 Ügyfél nyilvántartás ▼</span>
-        <span class="badge-count">{user_count} fő</span>
+    <div class="card" style="text-align: center; padding: 20px;">
+        <button onclick="toggleClientRegistry()" style="background: #FF8C00; color: #000; font-size: 16px; padding: 12px 24px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer;">
+            📋 Ügyfél nyilvántartás ({user_count})
+        </button>
     </div>
 
-    <!-- Rejtett kártya, ami gombnyomásra jelenik meg -->
-    <div id="client-registry-card" class="card" style="display: none;">
+    <div id="client-registry-card" class="card" style="display: none !important;">
         <h2>Regisztrált Felhasználók ({user_count})</h2>
         <table>
             <tr><th>Felhasználónév</th><th>Jelszó</th><th>Üzenetek kezelése</th><th style="text-align: right;">Műveletek</th></tr>
