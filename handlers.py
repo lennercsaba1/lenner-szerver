@@ -167,21 +167,18 @@ class SimpleServer(BaseHTTPRequestHandler):
                     <button onclick="createOrUpdateBubble('{user}', false); toggleUserChat('{user}');">Chat nyitása</button>
                     <button class="btn-log" onclick="toggleLoggedChats('{user}')">Naplózott beszélgetés</button>
                     <button class="btn-title-tab" onclick="toggleUserTitleTab('{user}')">Adatok</button>
-                </td>
-                <td style="text-align: right;">
-                    <button class="btn-clear-chat" onclick="confirmClearChat('{user}')">Chat törlése</button>
-                    <button class="btn-delete" onclick="confirmDelete('{user}')">X Törlés</button>
-                </td>
-            </tr>
-            <tr id="title-dropdown-{user}" class="inline-dropdown-row" style="display: none;" data-user-row data-username="{user}">
-                <td colspan="4" style="padding: 0; border-top: none;">
-                    <div class="inline-dropdown-content">
-                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                    
+                    <div id="data-panel-{user}" class="data-panel">
+                        <div style="display: flex; flex-direction: column; gap: 4px;">
                             <div><strong>Felhasználónév:</strong> {user}</div>
                             <div><strong>Elérhetőség:</strong> -</div>
                             <div><strong>Cím:</strong> -</div>
                         </div>
                     </div>
+                </td>
+                <td style="text-align: right;">
+                    <button class="btn-clear-chat" onclick="confirmClearChat('{user}')">Chat törlése</button>
+                    <button class="btn-delete" onclick="confirmDelete('{user}')">X Törlés</button>
                 </td>
             </tr>"""
 
