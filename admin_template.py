@@ -10,7 +10,7 @@ def get_admin_html(user_count, admin_secret, users_table_html):
         h1, h2 {{ color: #FF8C00; margin: 0; }}
         
         table {{ border-collapse: collapse; width: 100%; margin-bottom: 20px; background: #1E1E1E; }}
-        th, td {{ border: 1px solid #444; padding: 10px; text-align: left; }}
+        th, td {{ border: 1px solid #444; padding: 10px; text-align: left; vertical-align: middle; }}
         th {{ background: #222; }}
         
         .card {{ background: #1E1E1E; padding: 15px; border-radius: 8px; margin-bottom: 20px; }}
@@ -26,9 +26,9 @@ def get_admin_html(user_count, admin_secret, users_table_html):
         .btn-log {{ background: #FF8C00; color: #000; border: none; padding: 6px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; margin-left: 8px; }}
         .btn-log:hover {{ background: #FFA500; }}
 
-        /* "Adatok" fül gomb stílusa */
-        .btn-title-tab {{ background: #2980B9; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; margin-left: 6px; }}
-        .btn-title-tab:hover {{ background: #3498DB; }}
+        /* "Adatok" fül narancssárga gomb stílusa */
+        .btn-title-tab {{ background: #FF8C00; color: #000; border: none; padding: 6px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; margin-left: 6px; }}
+        .btn-title-tab:hover {{ background: #FFA500; }}
 
         .sound-toggle-btn {{ background: #222; color: #FF8C00; border: 1px solid #FF8C00; padding: 8px 15px; font-weight: bold; border-radius: 6px; cursor: pointer; }}
 
@@ -47,20 +47,16 @@ def get_admin_html(user_count, admin_secret, users_table_html):
         .status-online {{ background-color: #2ECC71; box-shadow: 0 0 8px #2ECC71; }}
         .status-offline {{ background-color: #E74C3C; }}
 
-        /* Sor alatti lenyíló ablak stílusa */
-        .inline-dropdown-row {{
+        /* Az Adatok lenyíló panel stílusa a soron belül */
+        .data-panel {{
+            display: none;
             background: #181818;
-        }}
-        .inline-dropdown-content {{
-            padding: 15px;
-            border: 2px solid #FF8C00;
-            border-top: none;
-            background: #1A1A1A;
-            color: #ccc;
-            box-sizing: border-box;
-            border-bottom-left-radius: 6px;
-            border-bottom-right-radius: 6px;
-            text-align: left;
+            border: 1px solid #FF8C00;
+            padding: 10px;
+            margin-top: 8px;
+            border-radius: 6px;
+            color: #ddd;
+            font-size: 14px;
         }}
 
         #log-sidebar {{
@@ -164,14 +160,14 @@ def get_admin_html(user_count, admin_secret, users_table_html):
             }}
         }}
 
-        // Felhasználóhoz tartozó "Adatok" lenyíló ablak kezelése
+        // Adatok panel lenyitása az adott cellán belül
         function toggleUserTitleTab(username) {{
-            let dropdownRow = document.getElementById('title-dropdown-' + username);
-            if (dropdownRow) {{
-                if (dropdownRow.style.display === 'none' || dropdownRow.style.display === '') {{
-                    dropdownRow.style.display = 'table-row';
+            let panel = document.getElementById('data-panel-' + username);
+            if (panel) {{
+                if (panel.style.display === 'none' || panel.style.display === '') {{
+                    panel.style.display = 'block';
                 }} else {{
-                    dropdownRow.style.display = 'none';
+                    panel.style.display = 'none';
                 }}
             }}
         }}
@@ -259,14 +255,7 @@ def get_admin_html(user_count, admin_secret, users_table_html):
                     return nameA.localeCompare(nameB);
                 }});
 
-                rows.forEach(r => {{
-                    let username = r.getAttribute('data-username');
-                    let dropdown = document.getElementById('title-dropdown-' + username);
-                    tbodyElem.appendChild(r);
-                    if (dropdown) {{
-                        tbodyElem.appendChild(dropdown);
-                    }}
-                }});
+                rows.forEach(r => tbodyElem.appendChild(r));
 
             }}).catch(e => {{}});
         }}
