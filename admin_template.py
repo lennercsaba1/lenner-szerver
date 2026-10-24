@@ -26,6 +26,18 @@ def get_admin_html(user_count, admin_secret, users_table_html):
 
         .sound-toggle-btn {{ background: #222; color: #FF8C00; border: 1px solid #FF8C00; padding: 8px 15px; font-weight: bold; border-radius: 6px; cursor: pointer; }}
 
+        /* Státusz pöttyök stílusa */
+        .status-dot {{
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+            vertical-align: middle;
+        }}
+        .status-online {{ background-color: #2ECC71; box-shadow: 0 0 8px #2ECC71; }}
+        .status-offline {{ background-color: #E74C3C; }}
+
         #log-sidebar {{
             position: fixed; top: 20px; right: 20px; width: 440px; height: calc(100vh - 100px);
             background: #1A1A1A; border: 2px solid #FF8C00; border-radius: 10px; display: none;
@@ -169,6 +181,24 @@ def get_admin_html(user_count, admin_secret, users_table_html):
                 let logSidebar = document.getElementById('log-sidebar');
                 if (logSidebar.style.display === 'flex' && currentLogUser) {{
                     loadLoggedChats(currentLogUser);
+                }}
+            }}).catch(e => {{}});
+
+            // Státuszok lekérdezése és frissítése valós időben
+            fetch('/admin_api_status?pass={admin_secret}')
+            .then(res => res.json())
+            .then(statuses => {{
+                for (let user in statuses) {{
+                    let dot = document.getElementById('status-dot-' + user);
+                    if (dot) {{
+                        if (statuses[user]) {{
+                            dot.className = "status-dot status-online";
+                            dot.title = "Online (Aktív)";
+                        }} else {{
+                            dot.className = "status-dot status-offline";
+                            dot.title = "Offline (Inaktív)";
+                        }}
+                    }}
                 }}
             }}).catch(e => {{}});
         }}
@@ -318,7 +348,7 @@ def get_admin_html(user_count, admin_secret, users_table_html):
                 let blob = new Blob(['\\ufeff' + docContent], {{ type: 'application/msword;charset=utf-8' }});
                 let url = URL.createObjectURL(blob);
                 let a = document.createElement('a');
-                a.href = url;
+                a.href  = url;
                 a.download = 'naplo_' + currentLogUser + '.doc';
                 document.body.appendChild(a);
                 a.click();
@@ -400,7 +430,7 @@ def get_admin_html(user_count, admin_secret, users_table_html):
     </div>
     
     <div class="card" style="text-align: center; padding: 15px;">
-        <button onclick="toggleClientRegistry()" style="background: #FF8C00; color: #000; font-size: 15px; padding: 10px 20px; border-radius: 6px; border: none; font-weight: bold; cursor: pointer;">
+        <button onclick="toggleClientRegistry()" style="background: #FF8C00; color: #000; font-size: 15px; padding: 10px 24px; border-radius: 6px; border: none; font-weight: bold; cursor: pointer;">
             📋 Ügyfél nyilvántartás ({user_count})
         </button>
     </div>
