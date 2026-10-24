@@ -272,7 +272,7 @@ class SimpleServer(BaseHTTPRequestHandler):
             
             user_messages = [
                 c for c in chats 
-                if c.get("sender"] == username or 
+                if c.get("sender") == username or 
                    (c.get("sender") == "Lenner Műhely" and c.get("target") == username)
             ]
             
