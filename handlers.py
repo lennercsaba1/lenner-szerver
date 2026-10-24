@@ -177,9 +177,9 @@ class SimpleServer(BaseHTTPRequestHandler):
                     </div>
                 </td>
                 <td style="text-align: right;">
+                    <button class="btn-invoice-tab" onclick="toggleUserInvoiceTab('{user}')">Számla kiállítás</button>
                     <button class="btn-clear-chat" onclick="confirmClearChat('{user}')">Chat törlése</button>
                     <button class="btn-delete" onclick="confirmDelete('{user}')">X Törlés</button>
-                    <button class="btn-invoice-tab" onclick="toggleUserInvoiceTab('{user}')">Számla kiállítás</button>
                     
                     <div id="invoice-panel-{user}" class="invoice-panel" style="text-align: left;">
                         <div style="display: flex; flex-direction: column; gap: 4px;">
