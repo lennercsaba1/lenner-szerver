@@ -155,7 +155,6 @@ class SimpleServer(BaseHTTPRequestHandler):
                 for user, pwd, is_online in sorted_users:
                     dot_class = "status-dot status-online" if is_online else "status-dot status-offline"
 
-                    # Felhasználói sor + közvetlenül alatt a rejtett "Cím" lenyíló sor
                     users_table_html += f"""<tr data-user-row data-username="{user}">
                 <td>
                     <div class="user-row-wrapper">
@@ -167,7 +166,7 @@ class SimpleServer(BaseHTTPRequestHandler):
                 <td>
                     <button onclick="createOrUpdateBubble('{user}', false); toggleUserChat('{user}');">Chat nyitása</button>
                     <button class="btn-log" onclick="toggleLoggedChats('{user}')">Naplózott beszélgetés</button>
-                    <button class="btn-title-tab" onclick="toggleUserTitleTab('{user}')">Cím</button>
+                    <button class="btn-title-tab" onclick="toggleUserTitleTab('{user}')">Adatok</button>
                 </td>
                 <td style="text-align: right;">
                     <button class="btn-clear-chat" onclick="confirmClearChat('{user}')">Chat törlése</button>
@@ -177,7 +176,11 @@ class SimpleServer(BaseHTTPRequestHandler):
             <tr id="title-dropdown-{user}" class="inline-dropdown-row" style="display: none;" data-user-row data-username="{user}">
                 <td colspan="4" style="padding: 0; border-top: none;">
                     <div class="inline-dropdown-content">
-                        <p style="margin: 0; color: #888; text-align: center;">Lenner Gumiszerviz - Cím ablak ({user})</p>
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <div><strong>Felhasználónév:</strong> {user}</div>
+                            <div><strong>Elérhetőség:</strong> -</div>
+                            <div><strong>Cím:</strong> -</div>
+                        </div>
                     </div>
                 </td>
             </tr>"""
