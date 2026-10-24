@@ -26,7 +26,7 @@ def get_admin_html(user_count, admin_secret, users_table_html):
         .btn-log {{ background: #FF8C00; color: #000; border: none; padding: 6px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; margin-left: 8px; }}
         .btn-log:hover {{ background: #FFA500; }}
 
-        /* Új "Cím" gomb stílusa a naplózott beszélgetés fül mellett */
+        /* "Adatok" fül gomb stílusa */
         .btn-title-tab {{ background: #2980B9; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; margin-left: 6px; }}
         .btn-title-tab:hover {{ background: #3498DB; }}
 
@@ -60,6 +60,7 @@ def get_admin_html(user_count, admin_secret, users_table_html):
             box-sizing: border-box;
             border-bottom-left-radius: 6px;
             border-bottom-right-radius: 6px;
+            text-align: left;
         }}
 
         #log-sidebar {{
@@ -163,7 +164,7 @@ def get_admin_html(user_count, admin_secret, users_table_html):
             }}
         }}
 
-        // Felhasználóhoz tartozó "Cím" lenyíló ablak kezelése
+        // Felhasználóhoz tartozó "Adatok" lenyíló ablak kezelése
         function toggleUserTitleTab(username) {{
             let dropdownRow = document.getElementById('title-dropdown-' + username);
             if (dropdownRow) {{
@@ -241,7 +242,6 @@ def get_admin_html(user_count, admin_secret, users_table_html):
                     }}
                 }}
 
-                // Sorok átrendezése úgy, hogy a lenyíló sávok együtt maradjanak a felhasználóval
                 let tbodyElem = document.getElementById('users-tbody');
                 let rows = Array.from(tbodyElem.querySelectorAll('tr[data-user-row]'));
                 
