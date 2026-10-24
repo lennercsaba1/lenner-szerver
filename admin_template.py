@@ -8,12 +8,9 @@ def get_admin_html(user_count, admin_secret, users_table_html):
         body {{ font-family: Arial; background: #121212; color: #fff; padding: 20px; margin: 0; }}
         .header-container {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }}
         h1, h2 {{ color: #FF8C00; margin: 0; }}
-        
-        /* Táblázat stílusok */
         table {{ border-collapse: collapse; width: 100%; margin-bottom: 20px; background: #1E1E1E; }}
         th, td {{ border: 1px solid #444; padding: 10px; text-align: left; }}
         th {{ background: #222; }}
-        
         .card {{ background: #1E1E1E; padding: 15px; border-radius: 8px; margin-bottom: 20px; }}
         input, button {{ padding: 8px; margin: 4px 0; background: #222; color: #fff; border: 1px solid #FF8C00; border-radius: 4px; }}
         button {{ background: #FF8C00; color: #000; font-weight: bold; cursor: pointer; }}
@@ -29,18 +26,14 @@ def get_admin_html(user_count, admin_secret, users_table_html):
 
         .sound-toggle-btn {{ background: #222; color: #FF8C00; border: 1px solid #FF8C00; padding: 8px 15px; font-weight: bold; border-radius: 6px; cursor: pointer; }}
 
-        /* Státusz sor konténer, hogy a pötty pontosan a táblázaton kívül balra legyen */
-        .user-row-wrapper {{
-            position: relative;
-            display: flex;
-            align-items: center;
-        }}
+        /* Státusz pöttyök stílusa */
         .status-dot {{
-            position: absolute;
-            left: -22px; /* Pontosan a táblázat keretén kívülre pozícionálva */
+            display: inline-block;
             width: 12px;
             height: 12px;
             border-radius: 50%;
+            margin-right: 8px;
+            vertical-align: middle;
         }}
         .status-online {{ background-color: #2ECC71; box-shadow: 0 0 8px #2ECC71; }}
         .status-offline {{ background-color: #E74C3C; }}
@@ -355,7 +348,7 @@ def get_admin_html(user_count, admin_secret, users_table_html):
                 let blob = new Blob(['\\ufeff' + docContent], {{ type: 'application/msword;charset=utf-8' }});
                 let url = URL.createObjectURL(blob);
                 let a = document.createElement('a');
-                a.href = url;
+                a.href  = url;
                 a.download = 'naplo_' + currentLogUser + '.doc';
                 document.body.appendChild(a);
                 a.click();
