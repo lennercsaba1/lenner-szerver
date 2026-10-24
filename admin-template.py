@@ -1,4 +1,4 @@
-def get_admin_html(user_count, admin_secret):
+def get_admin_html(user_count, admin_secret, users_table_html):
     return f"""<!DOCTYPE html>
 <html>
 <head>
@@ -399,8 +399,8 @@ def get_admin_html(user_count, admin_secret):
         <button id="sound-btn" class="sound-toggle-btn" onclick="toggleSound()">🔊 Hang: BE</button>
     </div>
     
-    <div class="card" style="text-align: center; padding: 20px;">
-        <button onclick="toggleClientRegistry()" style="background: #FF8C00; color: #000; font-size: 16px; padding: 12px 24px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer;">
+    <div class="card" style="text-align: center; padding: 15px;">
+        <button onclick="toggleClientRegistry()" style="background: #FF8C00; color: #000; font-size: 15px; padding: 10px 20px; border-radius: 6px; border: none; font-weight: bold; cursor: pointer;">
             📋 Ügyfél nyilvántartás ({user_count})
         </button>
     </div>
@@ -409,4 +409,35 @@ def get_admin_html(user_count, admin_secret):
         <h2>Regisztrált Felhasználók ({user_count})</h2>
         <table>
             <tr><th>Felhasználónév</th><th>Jelszó</th><th>Üzenetek kezelése</th><th style="text-align: right;">Műveletek</th></tr>
-"""
+            {users_table_html}
+        </table>
+    </div>
+
+    <!-- JOBB OLDALI NAPLÓZOTT BESZÉLGETÉS SÁV -->
+    <div id="log-sidebar">
+        <div id="log-header">
+            <span id="log-title">Naplózott beszélgetés</span>
+            <div class="log-header-buttons">
+                <button onclick="saveLogAsDoc()" style="background: #FF8C00; color: #000; padding: 2px 10px; margin:0; font-weight:bold;">Mentés</button>
+                <button onclick="let sb=document.getElementById('log-sidebar'); sb.style.display='none'; currentLogUser='';" style="background: #444; color: #fff; padding: 2px 8px; margin:0;">X</button>
+            </div>
+        </div>
+        <div id="log-body"></div>
+    </div>
+
+    <div id="bubbles-container"></div>
+
+    <div id="chat-modal">
+        <div id="chat-header">
+            <span id="chat-title">Chat</span>
+            <button onclick="closeChatCompletely(event)" style="background: #444; color: #fff; padding: 2px 8px; margin:0;">X</button>
+        </div>
+        <div id="chat-body"></div>
+        <div id="chat-footer">
+            <input type="text" id="reply-text" placeholder="Írd be a választ..." onkeydown="if(event.key==='Enter') sendAdminReply();">
+            <button onclick="sendAdminReply()">Küldés</button>
+        </div>
+    </div>
+
+</body>
+</html>"""
