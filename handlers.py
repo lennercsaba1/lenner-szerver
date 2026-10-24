@@ -112,14 +112,6 @@ class SimpleServer(BaseHTTPRequestHandler):
             user_count = len(users) if isinstance(users, dict) else 0
             html = get_admin_html(user_count, ADMIN_SECRET)
 
-            # Biztosítva, hogy alapból rejtve legyen (display: none !important)
-            html += f"""
-    <div id="client-registry-card" class="card" style="display: none !important;">
-        <h2>Regisztrált Felhasználók ({user_count})</h2>
-        <table>
-            <tr><th>Felhasználónév</th><th>Jelszó</th><th>Üzenetek kezelése</th><th style="text-align: right;">Műveletek</th></tr>
-            """
-
             if isinstance(users, dict):
                 for user, pwd in users.items():
                     html += f"""<tr>
@@ -247,7 +239,7 @@ class SimpleServer(BaseHTTPRequestHandler):
             
             user_messages = [
                 c for c in chats 
-                if c.get("sender") == username or 
+                if c.get("sender"] == username or 
                    (c.get("sender") == "Lenner Műhely" and c.get("target") == username)
             ]
             
