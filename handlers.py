@@ -164,15 +164,6 @@ class SimpleServer(BaseHTTPRequestHandler):
                 </td>
                 <td>{pwd}</td>
                 <td>
-                    <button class="btn-invoice-tab" onclick="toggleUserInvoiceTab('{user}')">Számla kiállítás</button>
-                    
-                    <div id="invoice-panel-{user}" class="invoice-panel">
-                        <div style="display: flex; flex-direction: column; gap: 4px;">
-                            <div><strong>Számla kiállítás panel</strong></div>
-                        </div>
-                    </div>
-                </td>
-                <td>
                     <button onclick="createOrUpdateBubble('{user}', false); toggleUserChat('{user}');">Chat nyitása</button>
                     <button class="btn-log" onclick="toggleLoggedChats('{user}')">Naplózott beszélgetés</button>
                     <button class="btn-title-tab" onclick="toggleUserTitleTab('{user}')">Adatok</button>
@@ -186,8 +177,15 @@ class SimpleServer(BaseHTTPRequestHandler):
                     </div>
                 </td>
                 <td style="text-align: right;">
+                    <button class="btn-invoice-tab" onclick="toggleUserInvoiceTab('{user}')">Számla kiállítás</button>
                     <button class="btn-clear-chat" onclick="confirmClearChat('{user}')">Chat törlése</button>
                     <button class="btn-delete" onclick="confirmDelete('{user}')">X Törlés</button>
+                    
+                    <div id="invoice-panel-{user}" class="invoice-panel" style="text-align: left;">
+                        <div style="display: flex; flex-direction: column; gap: 4px;">
+                            <div><strong>Számla kiállítás panel</strong></div>
+                        </div>
+                    </div>
                 </td>
             </tr>"""
 
