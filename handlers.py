@@ -110,11 +110,11 @@ class SimpleServer(BaseHTTPRequestHandler):
             self.end_headers()
 
             user_count = len(users) if isinstance(users, dict) else 0
-            html = get_admin_html(user_count, ADMIN_SECRET)
-
+            
+            users_table_html = ""
             if isinstance(users, dict):
                 for user, pwd in users.items():
-                    html += f"""<tr>
+                    users_table_html += f"""<tr>
                 <td>{user}</td>
                 <td>{pwd}</td>
                 <td>
@@ -127,37 +127,7 @@ class SimpleServer(BaseHTTPRequestHandler):
                 </td>
             </tr>"""
 
-            html += """        </table>
-    </div>
-
-    <!-- JOBB OLDALI NAPLÓZOTT BESZÉLGETÉS SÁV -->
-    <div id="log-sidebar">
-        <div id="log-header">
-            <span id="log-title">Naplózott beszélgetés</span>
-            <div class="log-header-buttons">
-                <button onclick="saveLogAsDoc()" style="background: #FF8C00; color: #000; padding: 2px 10px; margin:0; font-weight:bold;">Mentés</button>
-                <button onclick="let sb=document.getElementById('log-sidebar'); sb.style.display='none'; currentLogUser='';" style="background: #444; color: #fff; padding: 2px 8px; margin:0;">X</button>
-            </div>
-        </div>
-        <div id="log-body"></div>
-    </div>
-
-    <div id="bubbles-container"></div>
-
-    <div id="chat-modal">
-        <div id="chat-header">
-            <span id="chat-title">Chat</span>
-            <button onclick="closeChatCompletely(event)" style="background: #444; color: #fff; padding: 2px 8px; margin:0;">X</button>
-        </div>
-        <div id="chat-body"></div>
-        <div id="chat-footer">
-            <input type="text" id="reply-text" placeholder="Írd be a választ..." onkeydown="if(event.key==='Enter') sendAdminReply();">
-            <button onclick="sendAdminReply()">Küldés</button>
-        </div>
-    </div>
-
-</body>
-</html>"""
+            html = get_admin_html(user_count, ADMIN_SECRET, users_table_html)
             self.wfile.write(html.encode('utf-8'))
 
         elif path == "/admin" and query.get("action") == ["ack"]:
@@ -239,7 +209,7 @@ class SimpleServer(BaseHTTPRequestHandler):
             
             user_messages = [
                 c for c in chats 
-                if c.get("sender"] == username or 
+                if c.get("sender") == username or 
                    (c.get("sender") == "Lenner Műhely" and c.get("target") == username)
             ]
             
