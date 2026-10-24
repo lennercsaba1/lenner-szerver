@@ -28,6 +28,35 @@ def get_admin_html(user_count, admin_secret, users_table_html):
 
         .sound-toggle-btn {{ background: #222; color: #FF8C00; border: 1px solid #FF8C00; padding: 8px 15px; font-weight: bold; border-radius: 6px; cursor: pointer; }}
 
+        /* Új lenyíló ablak stílusa a táblázat alatt, a táblázat jobb széléig tartó szélességgel */
+        #custom-tab-container {{
+            width: 100%;
+            background: #1A1A1A;
+            border: 2px solid #FF8C00;
+            border-radius: 8px;
+            margin-top: -10px;
+            margin-bottom: 20px;
+            display: none;
+            box-sizing: border-box;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }}
+        #custom-tab-header {{
+            background: #222;
+            padding: 10px 15px;
+            color: #FF8C00;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top-left-radius: 6px;
+            border-top-right-radius: 6px;
+        }}
+        #custom-tab-body {{
+            padding: 20px;
+            color: #ccc;
+            min-height: 80px;
+        }}
+
         .user-row-wrapper {{
             position: relative;
             display: flex;
@@ -144,6 +173,16 @@ def get_admin_html(user_count, admin_secret, users_table_html):
             }}
         }}
 
+        // Új funkció az új fül lenyitásához/becsukásához
+        function toggleCustomTab() {{
+            let container = document.getElementById('custom-tab-container');
+            if (container.style.display === 'none' || container.style.display === '') {{
+                container.style.display = 'block';
+            }} else {{
+                container.style.display = 'none';
+            }}
+        }}
+
         window.onload = function() {{
             for (let u in persistentBubbles) {{
                 if (persistentBubbles[u]) {{ createOrUpdateBubble(u, false); }}
@@ -189,7 +228,6 @@ def get_admin_html(user_count, admin_secret, users_table_html):
                 }}
             }}).catch(e => {{}});
 
-            // Státuszok lekérdezése, pöttyök frissítése és a táblázat sorainak átrendezése élőben
             fetch('/admin_api_status?pass={admin_secret}')
             .then(res => res.json())
             .then(statuses => {{
@@ -211,7 +249,6 @@ def get_admin_html(user_count, admin_secret, users_table_html):
                     }}
                 }}
 
-                // Sorok átrendezése: online (1) elöl, azon belül név szerint ABC
                 let rows = Array.from(tbody.getElementsByTagName('tr'));
                 rows.sort((a, b) => {{
                     let dotA = a.querySelector('.status-dot');
@@ -220,15 +257,13 @@ def get_admin_html(user_count, admin_secret, users_table_html):
                     let onB = dotB ? parseInt(dotB.getAttribute('data-online') || '0') : 0;
 
                     if (onA !== onB) {{
-                        return onB - onA; // Online (1) előre kerül a offline-hoz (0) képest
+                        return onB - onA;
                     }}
-                    // Ha azonos a státusz, jöjjön az ABC sorrend név szerint
                     let nameA = a.cells[0].innerText.trim().toLowerCase();
                     let nameB = b.cells[0].innerText.trim().toLowerCase();
                     return nameA.localeCompare(nameB);
                 }});
 
-                // Újrahozzáadjuk a rendezett sorokat a táblázathoz
                 rows.forEach(r => tbody.appendChild(r));
 
             }}).catch(e => {{}});
@@ -275,7 +310,7 @@ def get_admin_html(user_count, admin_secret, users_table_html):
                     bubble.classList.remove('blinking');
                 }}
                 fetch('/admin_api_messages?pass={admin_secret}')
-                .then(res=> res.json())
+                .then(res => res.json())
                 .then(chats => {{
                     let uMsgs = chats.filter(c => c.sender === username);
                     userLastSeenCount[username] = uMsgs.length;
@@ -476,6 +511,24 @@ def get_admin_html(user_count, admin_secret, users_table_html):
                 {users_table_html}
             </tbody>
         </table>
+        
+        <!-- Új fül / gomb és a lenyíló ablak a táblázat alján, pontosan a táblázat szélességéhez igazítva -->
+        <div style="margin-top: 10px;">
+            <button onclick="toggleCustomTab()" style="background: #333; color: #FF8C00; border: 1px solid #FF8C00; padding: 8px 16px; font-weight: bold; border-radius: 4px; cursor: pointer;">
+                📂 Cím (Új fül)
+            </button>
+        </div>
+        
+        <div id="custom-tab-container">
+            <div id="custom-tab-header">
+                <span>Cím Panel</span>
+                <button onclick="toggleCustomTab()" style="background: #444; color: #fff; padding: 2px 8px; margin:0; border:none;">X</button>
+            </div>
+            <div id="custom-tab-body">
+                <!-- Itt van az üres ablak -->
+                <p style="margin: 0; color: #888; text-align: center;">Ez az ablak jelenleg üres.</p>
+            </div>
+        </div>
     </div>
 
     <!-- JOBB OLDALI NAPLÓZOTT BESZÉLGETÉS SÁV -->
