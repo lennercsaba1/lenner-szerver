@@ -157,10 +157,6 @@ class SimpleServer(BaseHTTPRequestHandler):
 
                     users_table_html += f"""<tr data-user-row data-username="{user}">
                 <td>
-                    <button class="btn-clear-chat" onclick="confirmClearChat('{user}')">Chat törlése</button>
-                    <button class="btn-delete" onclick="confirmDelete('{user}')">X Törlés</button>
-                </td>
-                <td>
                     <div class="user-row-wrapper">
                         <span id="status-dot-{user}" class="{dot_class}" title="Státusz" data-online="{1 if is_online else 0}"></span>
                         {user}
@@ -171,7 +167,6 @@ class SimpleServer(BaseHTTPRequestHandler):
                     <button onclick="createOrUpdateBubble('{user}', false); toggleUserChat('{user}');">Chat nyitása</button>
                     <button class="btn-log" onclick="toggleLoggedChats('{user}')">Naplózott beszélgetés</button>
                     <button class="btn-title-tab" onclick="toggleUserTitleTab('{user}')">Adatok</button>
-                    <button class="btn-invoice-tab" onclick="toggleUserInvoiceTab('{user}')">Számla kiállítás</button>
                     
                     <div id="data-panel-{user}" class="data-panel">
                         <div style="display: flex; flex-direction: column; gap: 4px;">
@@ -180,8 +175,13 @@ class SimpleServer(BaseHTTPRequestHandler):
                             <div><strong>Cím:</strong> -</div>
                         </div>
                     </div>
-
-                    <div id="invoice-panel-{user}" class="invoice-panel">
+                </td>
+                <td style="text-align: right;">
+                    <button class="btn-clear-chat" onclick="confirmClearChat('{user}')">Chat törlése</button>
+                    <button class="btn-delete" onclick="confirmDelete('{user}')">X Törlés</button>
+                    <button class="btn-invoice-tab" onclick="toggleUserInvoiceTab('{user}')">Számla kiállítás</button>
+                    
+                    <div id="invoice-panel-{user}" class="invoice-panel" style="text-align: left;">
                         <div style="display: flex; flex-direction: column; gap: 4px;">
                             <div><strong>Számla kiállítás panel</strong></div>
                         </div>
