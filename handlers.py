@@ -179,8 +179,8 @@ class SimpleServer(BaseHTTPRequestHandler):
                     <div style="display: flex; align-items: center; width: 100%;">
                         <button class="btn-invoice-tab" onclick="toggleUserInvoiceTab('{user}')">Számla kiállítás</button>
                         <div style="margin-left: auto; display: flex; gap: 5px;">
-                            <button class="btn-clear-chat" onclick="confirmClearChat('{user}')">Chat törlése</button>
-                            <button class="btn-delete" onclick="confirmDelete('{user}')">X Törlés</button>
+                            <button class="btn-clear-chat" onclick="confirmClearChat('{user}')">X Chat törlése</button>
+                            <button class="btn-delete" onclick="confirmDelete('{user}')">X Felhasználó törlése</button>
                         </div>
                     </div>
                     
