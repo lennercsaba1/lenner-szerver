@@ -29,9 +29,19 @@ def get_admin_html(user_count, admin_secret, users_table_html):
         .btn-title-tab {{ background: #FF8C00; color: #000; border: none; padding: 6px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; margin-left: 6px; }}
         .btn-title-tab:hover {{ background: #FFA500; }}
 
-        /* Zöld színű Számla kiállítás gomb stílusa (teljesen balra tolva a cellán belül) */
+        /* Zöld színű Számla kiállítás gomb stílusa */
         .btn-invoice-tab {{ background: #27AE60; color: #fff; border: none; padding: 5px 10px; border-radius: 4px; font-weight: bold; cursor: pointer; }}
         .btn-invoice-tab:hover {{ background: #2ECC71; }}
+
+        /* Zöld színű, enyhén pulzáló Chat nyitása gomb stílusa */
+        .btn-chat-open {{ background: #27AE60; color: #fff; border: none; padding: 5px 10px; border-radius: 4px; font-weight: bold; cursor: pointer; margin-right: 5px; animation: pulse-green 2s infinite; }}
+        .btn-chat-open:hover {{ background: #2ECC71; }}
+
+        @keyframes pulse-green {{
+            0% {{ box-shadow: 0 0 0 0 rgba(39, 174, 96, 0.7); }}
+            70% {{ box-shadow: 0 0 0 8px rgba(39, 174, 96, 0); }}
+            100% {{ box-shadow: 0 0 0 0 rgba(39, 174, 96, 0); }}
+        }}
 
         .sound-toggle-btn {{ background: #222; color: #FF8C00; border: 1px solid #FF8C00; padding: 8px 15px; font-weight: bold; border-radius: 6px; cursor: pointer; }}
 
