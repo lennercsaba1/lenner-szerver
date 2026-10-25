@@ -137,7 +137,6 @@ def admin():
                         {display_name}
                     </div>
                 </td>
-                <td>{pwd}</td>
                 <td>
                     <button class="btn-title-tab" onclick="toggleUserTitleTab('{u}')">Személyes adatok</button>
                     <button class="btn-log" onclick="toggleLoggedChats('{u}')">Naplózott beszélgetés</button>
