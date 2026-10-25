@@ -170,7 +170,6 @@ class SimpleServer(BaseHTTPRequestHandler):
                     
                     <div id="data-panel-{user}" class="data-panel">
                         <div style="display: flex; flex-direction: column; gap: 4px;">
-                            <div><strong>Felhasználónév:</strong> {user}</div>
                             <div><strong>Elérhetőség:</strong> -</div>
                             <div><strong>Cím:</strong> -</div>
                         </div>
