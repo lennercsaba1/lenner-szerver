@@ -1,23 +1,20 @@
 import os
 import time
 import random
-from flask import Flask, request, jsonify
+from datetime import datetime, timedelta
+from flask import Flask, request, jsonify, Response, redirect
+
+from database import load_data, save_data, DB_FILE, CHAT_FILE, LOG_FILE
+from admin_template import get_admin_html
 
 app = Flask(__name__)
 
-# Memóriában tárolt adatok (Élesben használhatsz SQLite/PostgreSQL adatbázist)
-users = {
-    # "admin": "1234"
-}
+ADMIN_SECRET = "lenneradmin123"
+user_last_activity = {}
 
-# SMS ellenőrző kódok: { "+36301234567": {"code": "123456", "expires": timestamp} }
+# Memóriában tárolt SMS kódok és elküldendő SMS sor
 verification_codes = {}
-
-# Várakozó SMS-ek sora a saját telefonodnak
 pending_sms_queue = []
-
-# Chat üzenetek
-chat_messages = []
 
 
 @app.route('/', methods=['GET'])
@@ -25,7 +22,172 @@ def index():
     return jsonify({"status": "ok", "message": "Lenner Gumiszerviz Szerver Működik!"}), 200
 
 
-# 1. Bejelentkezés
+# ==========================================
+# ADMIN PANEL VÉGPONTOK (/admin)
+# ==========================================
+
+@app.route('/admin', methods=['GET'])
+def admin():
+    password = request.args.get("pass", "")
+    if password != ADMIN_SECRET:
+        return "Helytelen admin jelszó!", 401
+
+    action = request.args.get("action", "")
+
+    if action == "ack":
+        target_user = request.args.get("user", "")
+        chats = load_data(CHAT_FILE)
+        for msg in chats:
+            if msg.get("sender") == target_user:
+                msg["read"] = True
+        save_data(CHAT_FILE, chats)
+        return "OK", 200
+
+    if action == "reply":
+        target_user = request.args.get("user", "")
+        reply_text = request.args.get("text", "")
+        if target_user and reply_text:
+            now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            new_msg = {
+                "sender": "Lenner Műhely",
+                "target": target_user,
+                "text": reply_text,
+                "timestamp": now_str,
+                "read": True
+            }
+            chats = load_data(CHAT_FILE)
+            chats.append(new_msg)
+            save_data(CHAT_FILE, chats)
+
+            logs = load_data(LOG_FILE)
+            logs.append(new_msg)
+            save_data(LOG_FILE, logs)
+        return "OK", 200
+
+    if action == "delete_user":
+        target_user = request.args.get("user", "")
+        if target_user:
+            users = load_data(DB_FILE)
+            if target_user in users:
+                del users[target_user]
+                save_data(DB_FILE, users)
+            chats = load_data(CHAT_FILE)
+            filtered_chats = [c for c in chats if c.get("sender") != target_user and c.get("target") != target_user]
+            save_data(CHAT_FILE, filtered_chats)
+            if target_user in user_last_activity:
+                del user_last_activity[target_user]
+        return redirect(f"/admin?pass={ADMIN_SECRET}")
+
+    if action == "clear_chat":
+        target_user = request.args.get("user", "")
+        if target_user:
+            chats = load_data(CHAT_FILE)
+            filtered_chats = [c for c in chats if c.get("sender") != target_user and c.get("target") != target_user]
+            save_data(CHAT_FILE, filtered_chats)
+        return redirect(f"/admin?pass={ADMIN_SECRET}")
+
+    # Admin HTML felület összeállítása
+    users = load_data(DB_FILE)
+    user_count = len(users) if isinstance(users, dict) else 0
+    users_table_html = ""
+    now = datetime.now()
+
+    if isinstance(users, dict):
+        user_list = []
+        for u, pwd in users.items():
+            is_online = False
+            if u in user_last_activity:
+                is_online = (now - user_last_activity[u]) < timedelta(seconds=60)
+            user_list.append((u, pwd, is_online))
+
+        sorted_users = sorted(user_list, key=lambda u: (not u[2], u[0].lower()))
+
+        for u, pwd, is_online in sorted_users:
+            dot_class = "status-dot status-online" if is_online else "status-dot status-offline"
+            users_table_html += f"""<tr data-user-row data-username="{u}">
+                <td>
+                    <div class="user-row-wrapper">
+                        <span id="status-dot-{u}" class="{dot_class}" title="Státusz" data-online="{1 if is_online else 0}"></span>
+                        {u}
+                    </div>
+                </td>
+                <td>{pwd}</td>
+                <td>
+                    <button onclick="createOrUpdateBubble('{u}', false); toggleUserChat('{u}');">Chat nyitása</button>
+                    <button class="btn-log" onclick="toggleLoggedChats('{u}')">Naplózott beszélgetés</button>
+                    <button class="btn-title-tab" onclick="toggleUserTitleTab('{u}')">Adatok</button>
+
+                    <div id="data-panel-{u}" class="data-panel">
+                        <div style="display: flex; flex-direction: column; gap: 4px;">
+                            <div><strong>Felhasználónév:</strong> {u}</div>
+                            <div><strong>Elérhetőség:</strong> -</div>
+                            <div><strong>Cím:</strong> -</div>
+                        </div>
+                    </div>
+                </td>
+                <td>
+                    <div style="display: flex; align-items: center; width: 100%;">
+                        <button class="btn-invoice-tab" onclick="toggleUserInvoiceTab('{u}')">Számla kiállítás</button>
+                        <div style="margin-left: auto; display: flex; gap: 5px;">
+                            <button class="btn-clear-chat" onclick="confirmClearChat('{u}')">Chat törlése</button>
+                            <button class="btn-delete" onclick="confirmDelete('{u}')">X Törlés</button>
+                        </div>
+                    </div>
+
+                    <div id="invoice-panel-{u}" class="invoice-panel">
+                        <div style="display: flex; flex-direction: column; gap: 4px;">
+                            <div><strong>Számla kiállítás panel</strong></div>
+                        </div>
+                    </div>
+                </td>
+            </tr>"""
+
+    html = get_admin_html(user_count, ADMIN_SECRET, users_table_html)
+    return Response(html, mimetype='text/html')
+
+
+@app.route('/admin_api_messages', methods=['GET'])
+def admin_api_messages():
+    password = request.args.get("pass", "")
+    if password != ADMIN_SECRET:
+        return jsonify({"error": "Unauthorized"}), 401
+    chats = load_data(CHAT_FILE)
+    return jsonify(chats), 200
+
+
+@app.route('/admin_api_logs', methods=['GET'])
+def admin_api_logs():
+    password = request.args.get("pass", "")
+    if password != ADMIN_SECRET:
+        return jsonify({"error": "Unauthorized"}), 401
+    logs = load_data(LOG_FILE)
+    return jsonify(logs), 200
+
+
+@app.route('/admin_api_status', methods=['GET'])
+def admin_api_status():
+    password = request.args.get("pass", "")
+    if password != ADMIN_SECRET:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    users = load_data(DB_FILE)
+    now = datetime.now()
+    status_dict = {}
+    if isinstance(users, dict):
+        for u in users.keys():
+            if u in user_last_activity:
+                is_online = (now - user_last_activity[u]) < timedelta(seconds=60)
+                status_dict[u] = is_online
+            else:
+                status_dict[u] = False
+
+    return jsonify(status_dict), 200
+
+
+# ==========================================
+# APP VÉGPONTOK (Login, Register, SMS, Chat)
+# ==========================================
+
 @app.route('/login', methods=['POST'])
 def login():
     data = request.get_json(silent=True) or {}
@@ -35,13 +197,14 @@ def login():
     if not username or not password:
         return jsonify({"error": "Hiányzó felhasználónév vagy jelszó"}), 400
 
+    users = load_data(DB_FILE)
     if users.get(username) == password:
+        user_last_activity[username] = datetime.now()
         return jsonify({"message": "Sikeres bejelentkezés"}), 200
     else:
         return jsonify({"error": "Helytelen felhasználónév vagy jelszó"}), 401
 
 
-# 2. SMS kód kérése regisztrációhoz
 @app.route('/request_sms', methods=['POST'])
 def request_sms():
     data = request.get_json(silent=True) or {}
@@ -50,14 +213,12 @@ def request_sms():
     if not phone:
         return jsonify({"error": "Telefonszám megadása kötelező"}), 400
 
-    # 6-jegyű kód generálása
     code = str(random.randint(100000, 999999))
     verification_codes[phone] = {
         "code": code,
-        "expires": time.time() + 300  # 5 percig érvényes
+        "expires": time.time() + 300
     }
 
-    # Betesszük a várakozási sorba az SMS-t
     pending_sms_queue.append({
         "phone": phone,
         "message": f"Lenner Műhely: A regisztrációs kódod: {code}"
@@ -67,17 +228,15 @@ def request_sms():
     return jsonify({"status": "ok", "message": "SMS kód elküldve a sorba"}), 200
 
 
-# 3. A te saját telefonod (SMS Gateway) innen kéri le a küldendő SMS-eket
 @app.route('/get_pending_sms', methods=['GET'])
 def get_pending_sms():
     global pending_sms_queue
     if pending_sms_queue:
-        sms = pending_sms_queue.pop(0)  # Kiveszi a legrégebbi SMS-t
+        sms = pending_sms_queue.pop(0)
         return jsonify(sms), 200
     return jsonify(None), 200
 
 
-# 4. Regisztráció véglegesítése (kód ellenőrzéssel)
 @app.route('/register', methods=['POST'])
 def register():
     data = request.get_json(silent=True) or {}
@@ -86,54 +245,81 @@ def register():
     phone = data.get('phone')
     code = data.get('code')
 
-    if not username or not password or not phone or not code:
+    if not username or not password:
         return jsonify({"error": "Minden mező kitöltése kötelező!"}), 400
 
-    # Ellenőrizzük, létezik-e már a felhasználónév
+    users = load_data(DB_FILE)
     if username in users:
         return jsonify({"error": "Ilyen felhasználónév már létezik!"}), 409
 
-    # SMS kód ellenőrzése
-    saved_info = verification_codes.get(phone)
-    if not saved_info:
-        return jsonify({"error": "Ehhez a telefonszámhoz nem tartozik aktív kód!"}), 400
+    if phone and code:
+        saved_info = verification_codes.get(phone)
+        if not saved_info:
+            return jsonify({"error": "Ehhez a telefonszámhoz nem tartozik aktív kód!"}), 400
 
-    if saved_info['code'] != code:
-        return jsonify({"error": "Érvénytelen SMS kód!"}), 400
+        if saved_info['code'] != code:
+            return jsonify({"error": "Érvénytelen SMS kód!"}), 400
 
-    if time.time() > saved_info['expires']:
-        return jsonify({"error": "A kód lejárt! Kérj újat."}), 400
+        if time.time() > saved_info['expires']:
+            return jsonify({"error": "A kód lejárt! Kérj újat."}), 400
 
-    # Ha minden jó, elmentjük a felhasználót
+        verification_codes.pop(phone, None)
+
+    # Elmentjük a felhasználót a JSON adatbázis fájlba
     users[username] = password
-    # Használt kód törlése
-    verification_codes.pop(phone, None)
+    save_data(DB_FILE, users)
 
     print(f"[ÚJ REGISZTRÁCIÓ] Felhasználó: {username}, Telefon: {phone}")
     return jsonify({"message": "Sikeres regisztráció!"}), 200
 
 
-# 5. Élő chat üzenet küldése
 @app.route('/chat', methods=['POST'])
 def chat():
     data = request.get_json(silent=True) or {}
-    sender = data.get('sender')
-    text = data.get('text')
+    username = data.get("sender")
+    if username:
+        user_last_activity[username] = datetime.now()
 
-    if sender and text:
-        chat_messages.append({"sender": sender, "text": text})
-        return jsonify({"status": "ok"}), 200
-    return jsonify({"error": "Hiányzó adatok"}), 400
+    chats = load_data(CHAT_FILE)
+    if not isinstance(chats, list):
+        chats = []
+
+    if "timestamp" not in data or not data["timestamp"]:
+        data["timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    data["read"] = False
+    chats.append(data)
+    save_data(CHAT_FILE, chats)
+
+    logs = load_data(LOG_FILE)
+    if not isinstance(logs, list):
+        logs = []
+    logs.append(data)
+    save_data(LOG_FILE, logs)
+
+    return jsonify({"status": "ok"}), 200
 
 
-# 6. Chat üzenetek lekérése
 @app.route('/get_messages', methods=['POST'])
 def get_messages():
-    return jsonify(chat_messages), 200
+    data = request.get_json(silent=True) or {}
+    username = data.get("username", "")
+    if username:
+        user_last_activity[username] = datetime.now()
+
+    chats = load_data(CHAT_FILE)
+    if not isinstance(chats, list):
+        chats = []
+
+    user_messages = [
+        c for c in chats
+        if c.get("sender") == username or
+           (c.get("sender") == "Lenner Műhely" and c.get("target") == username)
+    ]
+
+    return jsonify(user_messages), 200
 
 
-# --- Éles (Gunicorn) / Lokális indítási beállítás ---
 if __name__ == '__main__':
-    # Ez a blokk CSAK akkor fut le, ha lokálisan indítod el a gépeden (pl. python server.py)
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port, debug=True)
