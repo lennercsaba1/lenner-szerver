@@ -164,10 +164,9 @@ class SimpleServer(BaseHTTPRequestHandler):
                 </td>
                 <td>{pwd}</td>
                 <td>
-                    <button onclick="createOrUpdateBubble('{user}', false); toggleUserChat('{user}');">Chat nyitása</button>
+                    <button class="btn-title-tab" onclick="toggleUserTitleTab('{user}')">Személyes adatok</button>
                     <button class="btn-log" onclick="toggleLoggedChats('{user}')">Naplózott beszélgetés</button>
-                    <button class="btn-title-tab" onclick="toggleUserTitleTab('{user}')">Adatok</button>
-                    
+
                     <div id="data-panel-{user}" class="data-panel">
                         <div style="display: flex; flex-direction: column; gap: 4px;">
                             <div><strong>Elérhetőség:</strong> -</div>
@@ -177,6 +176,7 @@ class SimpleServer(BaseHTTPRequestHandler):
                 </td>
                 <td>
                     <div style="display: flex; align-items: center; width: 100%;">
+                        <button class="btn-chat-open" onclick="createOrUpdateBubble('{user}', false); toggleUserChat('{user}');">Chat nyitása</button>
                         <button class="btn-invoice-tab" onclick="toggleUserInvoiceTab('{user}')">Számla kiállítás</button>
                         <div style="margin-left: auto; display: flex; gap: 5px;">
                             <button class="btn-clear-chat" onclick="confirmClearChat('{user}')">X Chat törlése</button>
