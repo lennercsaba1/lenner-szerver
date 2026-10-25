@@ -102,13 +102,21 @@ def admin():
 
         sorted_users = sorted(user_list, key=lambda u: (not u[2], u[0].lower()))
 
-        for u, pwd, is_online in sorted_users:
+        for idx, (u, pwd_data, is_online) in enumerate(sorted_users, 1):
+            if isinstance(pwd_data, dict):
+                pwd = pwd_data.get("password", "")
+                phone_num = pwd_data.get("phone", u)
+            else:
+                pwd = str(pwd_data)
+                phone_num = u
+
+            display_name = f"Ügyfél #{idx}"
             dot_class = "status-dot status-online" if is_online else "status-dot status-offline"
             users_table_html += f"""<tr data-user-row data-username="{u}">
                 <td>
                     <div class="user-row-wrapper">
                         <span id="status-dot-{u}" class="{dot_class}" title="Státusz" data-online="{1 if is_online else 0}"></span>
-                        {u}
+                        {display_name}
                     </div>
                 </td>
                 <td>{pwd}</td>
@@ -119,7 +127,7 @@ def admin():
 
                     <div id="data-panel-{u}" class="data-panel">
                         <div style="display: flex; flex-direction: column; gap: 4px;">
-                            <div><strong>Elérhetőség:</strong> -</div>
+                            <div><strong>Elérhetőség:</strong> {phone_num}</div>
                             <div><strong>Cím:</strong> -</div>
                         </div>
                     </div>
@@ -194,14 +202,20 @@ def login():
     password = data.get('password')
 
     if not username or not password:
-        return jsonify({"error": "Hiányzó felhasználónév vagy jelszó"}), 400
+        return jsonify({"error": "Hiányzó telefonszám vagy jelszó"}), 400
 
     users = load_data(DB_FILE)
-    if users.get(username) == password:
+    pwd_entry = users.get(username)
+    if isinstance(pwd_entry, dict):
+        stored_password = pwd_entry.get("password")
+    else:
+        stored_password = pwd_entry
+
+    if stored_password and stored_password == password:
         user_last_activity[username] = datetime.now()
         return jsonify({"message": "Sikeres bejelentkezés"}), 200
     else:
-        return jsonify({"error": "Helytelen felhasználónév vagy jelszó"}), 401
+        return jsonify({"error": "Helytelen telefonszám vagy jelszó"}), 401
 
 
 @app.route('/request_sms', methods=['POST'])
@@ -249,7 +263,7 @@ def register():
 
     users = load_data(DB_FILE)
     if username in users:
-        return jsonify({"error": "Ilyen felhasználónév már létezik!"}), 409
+        return jsonify({"error": "Ezzel a telefonszámmal már regisztráltak!"}), 409
 
     if phone and code:
         saved_info = verification_codes.get(phone)
@@ -264,11 +278,14 @@ def register():
 
         verification_codes.pop(phone, None)
 
-    # Elmentjük a felhasználót a JSON adatbázis fájlba
-    users[username] = password
+    # Elmentjük a felhasználót és a telefonszámot az adatbázisba
+    users[username] = {
+        "password": password,
+        "phone": phone or username
+    }
     save_data(DB_FILE, users)
 
-    print(f"[ÚJ REGISZTRÁCIÓ] Felhasználó: {username}, Telefon: {phone}")
+    print(f"[ÚJ REGISZTRÁCIÓ] Telefonszám: {phone or username}")
     return jsonify({"message": "Sikeres regisztráció!"}), 200
 
 
