@@ -132,9 +132,8 @@ def admin():
                 </td>
                 <td>{pwd}</td>
                 <td>
-                    <button onclick="createOrUpdateBubble('{u}', false); toggleUserChat('{u}');">Chat nyitása</button>
+                    <button class="btn-title-tab" onclick="toggleUserTitleTab('{u}')">Személyes adatok</button>
                     <button class="btn-log" onclick="toggleLoggedChats('{u}')">Naplózott beszélgetés</button>
-                    <button class="btn-title-tab" onclick="toggleUserTitleTab('{u}')">Adatok</button>
 
                     <div id="data-panel-{u}" class="data-panel">
                         <div style="display: flex; flex-direction: column; gap: 4px;">
@@ -146,6 +145,7 @@ def admin():
                 </td>
                 <td>
                     <div style="display: flex; align-items: center; width: 100%;">
+                        <button class="btn-chat-open" onclick="createOrUpdateBubble('{u}', false); toggleUserChat('{u}');">Chat nyitása</button>
                         <button class="btn-invoice-tab" onclick="toggleUserInvoiceTab('{u}')">Számla kiállítás</button>
                         <div style="margin-left: auto; display: flex; gap: 5px;">
                             <button class="btn-clear-chat" onclick="confirmClearChat('{u}')">X Chat törlése</button>
