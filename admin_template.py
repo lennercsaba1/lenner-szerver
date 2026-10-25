@@ -513,7 +513,7 @@ def get_admin_html(user_count, admin_secret, users_table_html):
         <h2>Regisztrált Felhasználók ({user_count})</h2>
         <table>
             <thead>
-                <tr><th>Névsor</th><th>Jelszó</th><th>Adatok kezelése</th><th>Utolsó bejelentkezés</th><th>Műveletek</th></tr>
+                <tr><th>Névsor</th><th>Adatok kezelése</th><th>Utolsó bejelentkezés</th><th>Műveletek</th></tr>
             </thead>
             <tbody id="users-tbody">
                 {users_table_html}
