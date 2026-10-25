@@ -166,6 +166,7 @@ class SimpleServer(BaseHTTPRequestHandler):
                 <td>
                     <button class="btn-title-tab" onclick="toggleUserTitleTab('{user}')">Személyes adatok</button>
                     <button class="btn-log" onclick="toggleLoggedChats('{user}')">Naplózott beszélgetés</button>
+                    <button class="btn-title-tab" onclick="alert('Munkalapok megnyitása...')">Munkalapok</button>
 
                     <div id="data-panel-{user}" class="data-panel">
                         <div style="display: flex; flex-direction: column; gap: 4px;">
@@ -174,6 +175,7 @@ class SimpleServer(BaseHTTPRequestHandler):
                         </div>
                     </div>
                 </td>
+                <td style="font-size: 13px; color: #ccc;">-</td>
                 <td>
                     <div style="display: flex; align-items: center; width: 100%;">
                         <button class="btn-chat-open" onclick="createOrUpdateBubble('{user}', false); toggleUserChat('{user}');">Chat nyitása</button>
