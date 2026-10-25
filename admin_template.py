@@ -20,8 +20,8 @@ def get_admin_html(user_count, admin_secret, users_table_html):
         .btn-delete {{ background: #C0392B; color: #fff; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-weight: bold; }}
         .btn-delete:hover {{ background: #E74C3C; }}
 
-        .btn-clear-chat {{ background: #8E44AD; color: #fff; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-weight: bold; margin-left: 5px; }}
-        .btn-clear-chat:hover {{ background: #9B59B6; }}
+        .btn-clear-chat {{ background: #C0392B; color: #fff; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-weight: bold; margin-left: 5px; }}
+        .btn-clear-chat:hover {{ background: #E74C3C; }}
 
         .btn-log {{ background: #FF8C00; color: #000; border: none; padding: 6px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; margin-left: 8px; }}
         .btn-log:hover {{ background: #FFA500; }}
