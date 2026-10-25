@@ -3,6 +3,7 @@ import time
 import random
 from datetime import datetime, timedelta
 from flask import Flask, request, jsonify, Response, redirect
+from werkzeug.security import generate_password_hash, check_password_hash
 
 from database import load_data, save_data, DB_FILE, CHAT_FILE, LOG_FILE
 from admin_template import get_admin_html
@@ -231,11 +232,13 @@ def login():
     else:
         stored_password = pwd_entry
 
-    if stored_password and stored_password == password:
-        user_last_activity[username] = datetime.now()
-        return jsonify({"message": "Sikeres bejelentkezés"}), 200
-    else:
-        return jsonify({"error": "Helytelen telefonszám vagy jelszó"}), 401
+    if stored_password:
+        is_valid = (stored_password == password) or check_password_hash(stored_password, password)
+        if is_valid:
+            user_last_activity[username] = datetime.now()
+            return jsonify({"message": "Sikeres bejelentkezés"}), 200
+
+    return jsonify({"error": "Helytelen telefonszám vagy jelszó"}), 401
 
 
 @app.route('/request_sms', methods=['POST'])
@@ -305,9 +308,12 @@ def register():
 
         verification_codes.pop(phone, None)
 
-    # Elmentjük a felhasználót és az összes adatát az adatbázisba
+    # Titkosítjuk a jelszót mentés előtt (Password Hashing)
+    hashed_password = generate_password_hash(password)
+
+    # Elmentjük a felhasználót és az összes adatát a Google Firebase Firestore adatbázisba
     users[username] = {
-        "password": password,
+        "password": hashed_password,
         "phone": phone or username,
         "name": name,
         "zip": zip_code,
@@ -318,7 +324,7 @@ def register():
     }
     save_data(DB_FILE, users)
 
-    print(f"[ÚJ REGISZTRÁCIÓ] Név: {name}, Telefon: {phone or username}")
+    print(f"[ÚJ REGISZTRÁCIÓ FIRESTORE-BA] Név: {name}, Telefon: {phone or username}")
     return jsonify({"message": "Sikeres regisztráció!"}), 200
 
 
