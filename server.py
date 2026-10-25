@@ -106,7 +106,7 @@ def admin():
             if isinstance(pwd_data, dict):
                 pwd = pwd_data.get("password", "")
                 phone_num = pwd_data.get("phone", u)
-                full_name = pwd_data.get("name", "") or "-"
+                full_name = pwd_data.get("name", "")
                 zip_c = pwd_data.get("zip", "")
                 city_c = pwd_data.get("city", "")
                 street_c = pwd_data.get("street", "")
@@ -118,10 +118,10 @@ def admin():
             else:
                 pwd = str(pwd_data)
                 phone_num = u
-                full_name = "-"
+                full_name = ""
                 full_address = "-"
 
-            display_name = f"Ügyfél #{idx}"
+            display_name = full_name.strip() if full_name.strip() else f"Ügyfél #{idx}"
             dot_class = "status-dot status-online" if is_online else "status-dot status-offline"
             users_table_html += f"""<tr data-user-row data-username="{u}">
                 <td>
@@ -138,7 +138,7 @@ def admin():
 
                     <div id="data-panel-{u}" class="data-panel">
                         <div style="display: flex; flex-direction: column; gap: 4px;">
-                            <div><strong>Név:</strong> {full_name}</div>
+                            <div><strong>Név:</strong> {full_name or '-'}</div>
                             <div><strong>Elérhetőség:</strong> {phone_num}</div>
                             <div><strong>Cím:</strong> {full_address}</div>
                         </div>
@@ -148,8 +148,8 @@ def admin():
                     <div style="display: flex; align-items: center; width: 100%;">
                         <button class="btn-invoice-tab" onclick="toggleUserInvoiceTab('{u}')">Számla kiállítás</button>
                         <div style="margin-left: auto; display: flex; gap: 5px;">
-                            <button class="btn-clear-chat" onclick="confirmClearChat('{u}')">Chat törlése</button>
-                            <button class="btn-delete" onclick="confirmDelete('{u}')">X Törlés</button>
+                            <button class="btn-clear-chat" onclick="confirmClearChat('{u}')">X Chat törlése</button>
+                            <button class="btn-delete" onclick="confirmDelete('{u}')">X Felhasználó törlése</button>
                         </div>
                     </div>
 
