@@ -106,9 +106,20 @@ def admin():
             if isinstance(pwd_data, dict):
                 pwd = pwd_data.get("password", "")
                 phone_num = pwd_data.get("phone", u)
+                full_name = pwd_data.get("name", "") or "-"
+                zip_c = pwd_data.get("zip", "")
+                city_c = pwd_data.get("city", "")
+                street_c = pwd_data.get("street", "")
+                h_num = pwd_data.get("house_number", "")
+                fl_door = pwd_data.get("floor_door", "")
+
+                addr_parts = [p for p in [f"{zip_c} {city_c}".strip(), f"{street_c} {h_num}".strip(), fl_door] if p]
+                full_address = ", ".join(addr_parts) if addr_parts else "-"
             else:
                 pwd = str(pwd_data)
                 phone_num = u
+                full_name = "-"
+                full_address = "-"
 
             display_name = f"Ügyfél #{idx}"
             dot_class = "status-dot status-online" if is_online else "status-dot status-offline"
@@ -127,8 +138,9 @@ def admin():
 
                     <div id="data-panel-{u}" class="data-panel">
                         <div style="display: flex; flex-direction: column; gap: 4px;">
+                            <div><strong>Név:</strong> {full_name}</div>
                             <div><strong>Elérhetőség:</strong> {phone_num}</div>
-                            <div><strong>Cím:</strong> -</div>
+                            <div><strong>Cím:</strong> {full_address}</div>
                         </div>
                     </div>
                 </td>
@@ -258,6 +270,13 @@ def register():
     phone = data.get('phone')
     code = data.get('code')
 
+    name = data.get('name', '')
+    zip_code = data.get('zip', '')
+    city = data.get('city', '')
+    street = data.get('street', '')
+    house_number = data.get('house_number', '')
+    floor_door = data.get('floor_door', '')
+
     if not username or not password:
         return jsonify({"error": "Minden mező kitöltése kötelező!"}), 400
 
@@ -278,14 +297,20 @@ def register():
 
         verification_codes.pop(phone, None)
 
-    # Elmentjük a felhasználót és a telefonszámot az adatbázisba
+    # Elmentjük a felhasználót és az összes adatát az adatbázisba
     users[username] = {
         "password": password,
-        "phone": phone or username
+        "phone": phone or username,
+        "name": name,
+        "zip": zip_code,
+        "city": city,
+        "street": street,
+        "house_number": house_number,
+        "floor_door": floor_door
     }
     save_data(DB_FILE, users)
 
-    print(f"[ÚJ REGISZTRÁCIÓ] Telefonszám: {phone or username}")
+    print(f"[ÚJ REGISZTRÁCIÓ] Név: {name}, Telefon: {phone or username}")
     return jsonify({"message": "Sikeres regisztráció!"}), 200
 
 
