@@ -132,7 +132,8 @@ def get_messages():
     return jsonify(chat_messages), 200
 
 
+# --- Éles (Gunicorn) / Lokális indítási beállítás ---
 if __name__ == '__main__':
-    # Helyi teszteléshez
+    # Ez a blokk CSAK akkor fut le, ha lokálisan indítod el a gépeden (pl. python server.py)
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port, debug=True)
