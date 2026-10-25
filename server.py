@@ -123,6 +123,12 @@ def admin():
 
             display_name = full_name.strip() if full_name.strip() else f"Ügyfél #{idx}"
             dot_class = "status-dot status-online" if is_online else "status-dot status-offline"
+
+            if u in user_last_activity:
+                last_active_str = user_last_activity[u].strftime("%Y-%m-%d %H:%M")
+            else:
+                last_active_str = "-"
+
             users_table_html += f"""<tr data-user-row data-username="{u}">
                 <td>
                     <div class="user-row-wrapper">
@@ -134,6 +140,7 @@ def admin():
                 <td>
                     <button class="btn-title-tab" onclick="toggleUserTitleTab('{u}')">Személyes adatok</button>
                     <button class="btn-log" onclick="toggleLoggedChats('{u}')">Naplózott beszélgetés</button>
+                    <button class="btn-title-tab" onclick="alert('Munkalapok megnyitása...')">Munkalapok</button>
 
                     <div id="data-panel-{u}" class="data-panel">
                         <div style="display: flex; flex-direction: column; gap: 4px;">
@@ -143,6 +150,7 @@ def admin():
                         </div>
                     </div>
                 </td>
+                <td style="font-size: 13px; color: #ccc;">{last_active_str}</td>
                 <td>
                     <div style="display: flex; align-items: center; width: 100%;">
                         <button class="btn-chat-open" onclick="createOrUpdateBubble('{u}', false); toggleUserChat('{u}');">Chat nyitása</button>
