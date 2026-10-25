@@ -162,7 +162,6 @@ class SimpleServer(BaseHTTPRequestHandler):
                         {user}
                     </div>
                 </td>
-                <td>{pwd}</td>
                 <td>
                     <button class="btn-title-tab" onclick="toggleUserTitleTab('{user}')">Személyes adatok</button>
                     <button class="btn-log" onclick="toggleLoggedChats('{user}')">Naplózott beszélgetés</button>
