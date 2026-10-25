@@ -119,7 +119,6 @@ def admin():
 
                     <div id="data-panel-{u}" class="data-panel">
                         <div style="display: flex; flex-direction: column; gap: 4px;">
-                            <div><strong>Felhasználónév:</strong> {u}</div>
                             <div><strong>Elérhetőség:</strong> -</div>
                             <div><strong>Cím:</strong> -</div>
                         </div>
