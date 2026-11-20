@@ -95,17 +95,16 @@ def admin():
 
     if isinstance(users, dict):
         user_list = []
-        for u, pwd in users.items():
+        for u, pwd_data in users.items():
             is_online = False
             if u in user_last_activity:
                 is_online = (now - user_last_activity[u]) < timedelta(seconds=60)
-            user_list.append((u, pwd, is_online))
+            user_list.append((u, pwd_data, is_online))
 
         sorted_users = sorted(user_list, key=lambda u: (not u[2], u[0].lower()))
 
         for idx, (u, pwd_data, is_online) in enumerate(sorted_users, 1):
             if isinstance(pwd_data, dict):
-                pwd = pwd_data.get("password", "")
                 phone_num = pwd_data.get("phone", u)
                 full_name = pwd_data.get("name", "")
                 zip_c = pwd_data.get("zip", "")
@@ -117,7 +116,6 @@ def admin():
                 addr_parts = [p for p in [f"{zip_c} {city_c}".strip(), f"{street_c} {h_num}".strip(), fl_door] if p]
                 full_address = ", ".join(addr_parts) if addr_parts else "-"
             else:
-                pwd = str(pwd_data)
                 phone_num = u
                 full_name = ""
                 full_address = "-"
@@ -225,30 +223,37 @@ def login():
         return jsonify({"error": "Hiányzó telefonszám vagy jelszó"}), 400
 
     users = load_data(DB_FILE)
-    pwd_entry = users.get(username)
+    pwd_entry = None
 
-    # Ha a pontos kulccsal nincs meg, keresés a telefonszám / kulcsok között
-    if not pwd_entry and isinstance(users, dict):
-        for u_key, u_val in users.items():
-            if u_key.strip() == username:
-                pwd_entry = u_val
-                break
-            if isinstance(u_val, dict) and u_val.get("phone", "").strip() == username:
-                pwd_entry = u_val
-                break
+    if isinstance(users, dict):
+        pwd_entry = users.get(username)
+        # Ha a pontos kulccsal nincs meg, keresés a telefonszám / kulcsok között
+        if not pwd_entry:
+            clean_user = username.replace("+", "").replace(" ", "").replace("-", "")
+            for u_key, u_val in users.items():
+                clean_key = str(u_key).replace("+", "").replace(" ", "").replace("-", "")
+                if clean_key == clean_user:
+                    pwd_entry = u_val
+                    break
+                if isinstance(u_val, dict):
+                    u_phone = str(u_val.get("phone", "")).replace("+", "").replace(" ", "").replace("-", "")
+                    if u_phone and u_phone == clean_user:
+                        pwd_entry = u_val
+                        break
 
     user_name = ""
+    stored_password = None
     if isinstance(pwd_entry, dict):
         stored_password = pwd_entry.get("password")
-        user_name = pwd_entry.get("name", "").strip()
-    else:
-        stored_password = pwd_entry
+        user_name = pwd_entry.get("name") or pwd_entry.get("fullName") or ""
+    elif pwd_entry:
+        stored_password = str(pwd_entry)
 
     if stored_password:
         is_valid = (stored_password == password) or check_password_hash(stored_password, password)
         if is_valid:
             user_last_activity[username] = datetime.now()
-            print(f"[LOGIN SIKER] Felhasználó: {username}, Megtalált Név: '{user_name}'")
+            print(f"[LOGIN SIKER] Telefonszám: '{username}', Név: '{user_name}'")
             return jsonify({
                 "message": "Sikeres bejelentkezés",
                 "name": user_name or username
@@ -260,7 +265,7 @@ def login():
 @app.route('/request_sms', methods=['POST'])
 def request_sms():
     data = request.get_json(silent=True) or {}
-    phone = data.get('phone')
+    phone = (data.get('phone') or '').strip()
 
     if not phone:
         return jsonify({"error": "Telefonszám megadása kötelező"}), 400
@@ -297,7 +302,7 @@ def register():
     phone = (data.get('phone') or '').strip()
     code = (data.get('code') or '').strip()
 
-    name = (data.get('name') or '').strip()
+    name = (data.get('name') or data.get('fullName') or '').strip()
     zip_code = (data.get('zip') or '').strip()
     city = (data.get('city') or '').strip()
     street = (data.get('street') or '').strip()
@@ -308,11 +313,21 @@ def register():
         return jsonify({"error": "Minden mező kitöltése kötelező!"}), 400
 
     users = load_data(DB_FILE)
+    if not isinstance(users, dict):
+        users = {}
+
     if username in users:
         return jsonify({"error": "Ezzel a telefonszámmal már regisztráltak!"}), 409
 
     if phone and code:
         saved_info = verification_codes.get(phone)
+        if not saved_info:
+            clean_p = phone.replace("+", "").replace(" ", "").replace("-", "")
+            for k, v in verification_codes.items():
+                if k.replace("+", "").replace(" ", "").replace("-", "") == clean_p:
+                    saved_info = v
+                    break
+
         if not saved_info:
             return jsonify({"error": "Ehhez a telefonszámhoz nem tartozik aktív kód!"}), 400
 
