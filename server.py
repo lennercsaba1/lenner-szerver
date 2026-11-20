@@ -218,18 +218,29 @@ def admin_api_status():
 @app.route('/login', methods=['POST'])
 def login():
     data = request.get_json(silent=True) or {}
-    username = data.get('username')
-    password = data.get('password')
+    username = (data.get('username') or '').strip()
+    password = (data.get('password') or '').strip()
 
     if not username or not password:
         return jsonify({"error": "Hiányzó telefonszám vagy jelszó"}), 400
 
     users = load_data(DB_FILE)
     pwd_entry = users.get(username)
+
+    # Ha a pontos kulccsal nincs meg, keresés a telefonszám / kulcsok között
+    if not pwd_entry and isinstance(users, dict):
+        for u_key, u_val in users.items():
+            if u_key.strip() == username:
+                pwd_entry = u_val
+                break
+            if isinstance(u_val, dict) and u_val.get("phone", "").strip() == username:
+                pwd_entry = u_val
+                break
+
     user_name = ""
     if isinstance(pwd_entry, dict):
         stored_password = pwd_entry.get("password")
-        user_name = pwd_entry.get("name", "")
+        user_name = pwd_entry.get("name", "").strip()
     else:
         stored_password = pwd_entry
 
@@ -237,6 +248,7 @@ def login():
         is_valid = (stored_password == password) or check_password_hash(stored_password, password)
         if is_valid:
             user_last_activity[username] = datetime.now()
+            print(f"[LOGIN SIKER] Felhasználó: {username}, Megtalált Név: '{user_name}'")
             return jsonify({
                 "message": "Sikeres bejelentkezés",
                 "name": user_name or username
@@ -280,17 +292,17 @@ def get_pending_sms():
 @app.route('/register', methods=['POST'])
 def register():
     data = request.get_json(silent=True) or {}
-    username = data.get('username')
-    password = data.get('password')
-    phone = data.get('phone')
-    code = data.get('code')
+    username = (data.get('username') or '').strip()
+    password = (data.get('password') or '').strip()
+    phone = (data.get('phone') or '').strip()
+    code = (data.get('code') or '').strip()
 
-    name = data.get('name', '')
-    zip_code = data.get('zip', '')
-    city = data.get('city', '')
-    street = data.get('street', '')
-    house_number = data.get('house_number', '')
-    floor_door = data.get('floor_door', '')
+    name = (data.get('name') or '').strip()
+    zip_code = (data.get('zip') or '').strip()
+    city = (data.get('city') or '').strip()
+    street = (data.get('street') or '').strip()
+    house_number = (data.get('house_number') or '').strip()
+    floor_door = (data.get('floor_door') or '').strip()
 
     if not username or not password:
         return jsonify({"error": "Minden mező kitöltése kötelező!"}), 400
@@ -328,7 +340,7 @@ def register():
     }
     save_data(DB_FILE, users)
 
-    print(f"[ÚJ REGISZTRÁCIÓ FIRESTORE-BA] Név: {name}, Telefon: {phone or username}")
+    print(f"[ÚJ REGISZTRÁCIÓ FIRESTORE-BA] Név: '{name}', Telefon: '{phone or username}'")
     return jsonify({"message": "Sikeres regisztráció!"}), 200
 
 
