@@ -226,8 +226,10 @@ def login():
 
     users = load_data(DB_FILE)
     pwd_entry = users.get(username)
+    user_name = ""
     if isinstance(pwd_entry, dict):
         stored_password = pwd_entry.get("password")
+        user_name = pwd_entry.get("name", "")
     else:
         stored_password = pwd_entry
 
@@ -235,7 +237,10 @@ def login():
         is_valid = (stored_password == password) or check_password_hash(stored_password, password)
         if is_valid:
             user_last_activity[username] = datetime.now()
-            return jsonify({"message": "Sikeres bejelentkezés"}), 200
+            return jsonify({
+                "message": "Sikeres bejelentkezés",
+                "name": user_name or username
+            }), 200
 
     return jsonify({"error": "Helytelen telefonszám vagy jelszó"}), 401
 
